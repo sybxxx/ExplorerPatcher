@@ -73,6 +73,7 @@ HRESULT STDMETHODCALLTYPE epw_factory_CreateInstance(
             else
             {
                 thisobj->lpVtbl = &IEPWeather_Vtbl;
+                thisobj->dwBrowserGeneration = 1;
                 bOk = TRUE;
             }
         }

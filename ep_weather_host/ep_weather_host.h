@@ -16,6 +16,8 @@
 #pragma comment(lib, "uxtheme.lib")
 #include <ShellScalingApi.h>
 #include <shlwapi.h>
+#include <psapi.h>
+#pragma comment(lib, "Psapi.lib")
 
 DEFINE_GUID(IID_ITaskbarList,
     0x56FDF342, 0xFD6D, 0x11d0, 0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90);
@@ -31,6 +33,12 @@ DEFINE_GUID(IID_ITaskbarList,
 #define EP_WEATHER_TIMER_RESIZE_WINDOW_DELAY 150
 #define EP_WEATHER_TIMER_EXECUTEDATASCRIPT 20
 #define EP_WEATHER_TIMER_EXECUTEDATASCRIPT_DELAY 500
+#define EP_WEATHER_TIMER_MEMORY_GUARD 21
+#define EP_WEATHER_TIMER_BROWSER_RETRY 22
+#define EP_WEATHER_TIMER_MEMORY_GUARD_INTERVAL 30000
+#define EP_WEATHER_TIMER_BROWSER_RETRY_DELAY 5000
+
+#define EP_WEATHER_WM_RESTART_BROWSER (WM_USER + 15)
 
 typedef struct _GenericObjectWithThis GenericObjectWithThis;
 
@@ -45,6 +53,10 @@ typedef interface EPWeather
     /*//*/HWND hWnd;//
 
     INT64 bBrowserBusy; // interlocked
+    INT64 bBrowserRestarting; // interlocked
+    INT64 bBrowserRestartPending; // interlocked
+    LONG64 dwBrowserGeneration; // interlocked
+    DWORD dwBrowserRestartFailures;
     HWND hNotifyWnd; // interlocked
     LONG64 dwTemperatureUnit; // interlocked
     LONG64 dwUpdateSchedule; // interlocked
@@ -82,6 +94,7 @@ typedef interface EPWeather
 
     RECT rcBorderThickness; // local variables:
     /*//*/ITaskbarList* pTaskList;//
+    /*//*/ICoreWebView2Environment* pCoreWebView2Environment;//
     /*//*/ICoreWebView2Controller* pCoreWebView2Controller;//
     /*//*/ICoreWebView2* pCoreWebView2;//
     /*//*/GenericObjectWithThis* pCoreWebView2NavigationStartingEventHandler;//
@@ -95,6 +108,7 @@ typedef interface EPWeather
     LONG64 dpiYInitial;
     FARPROC SHRegGetValueFromHKCUHKLMFunc;
     LONG64 cbGenericObject;
+    WCHAR wszUserDataFolder[MAX_PATH];
 
     /**/HANDLE hSignalExitMainThread;//
     /**/HANDLE hSignalKillSwitch;//
@@ -208,6 +222,7 @@ typedef struct _GenericObjectWithThis {
     LONG64 cbCount;
     EPWeather* _this;
     LPWSTR pName;
+    LONG64 browserGeneration;
 } GenericObjectWithThis;
 GenericObjectWithThis* GenericObjectWithThis_MakeAndInitialize(IUnknownVtbl* vtbl, EPWeather* _this, const LPWSTR pName);
 ULONG   STDMETHODCALLTYPE GenericObjectWithThis_AddRef(GenericObjectWithThis* _this);

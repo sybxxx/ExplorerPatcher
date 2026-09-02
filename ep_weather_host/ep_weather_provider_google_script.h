@@ -122,6 +122,12 @@ function ep_download_image_blob(url) {\n\
     for(var i=0;i<request.responseText.length;i++){ binary[i] = request.responseText.charCodeAt(i) & 0xff; }\n\
     return URL.createObjectURL(new Blob([binary.buffer]));\n\
 }\n\
+function ep_weather_revoke_image_url(im) {\n\
+    if (im.ep_weather_object_url) {\n\
+        URL.revokeObjectURL(im.ep_weather_object_url);\n\
+        im.ep_weather_object_url = 0;\n\
+    }\n\
+}\n\
 function IsDay(has_time, hrs, mins) {\n\
 var w_url = document.querySelector('.YfftMc').childNodes[0].href;\n\
 var lat = 0.0;\n\
@@ -241,8 +247,16 @@ LPCWSTR ep_weather_provider_google_script011 = L"\
     else        final_img = ep_download_image_blob('https://user-images.githubusercontent.com/6503598/156949445-60d12efa-a21d-40e0-b9a8-1b7a84e58944.png');\n\
 }\n\
 if (final_img != 0) {\n\
+    ep_weather_revoke_image_url(im);\n\
     if (im.id != document.getElementsByClassName(\"YQ4gaf zr758c\")[0].id) { im.width = 48; im.height = 48; }\n\
+    im.ep_weather_object_url = final_img;\n\
     im.src = final_img;\n\
+    setTimeout(function() {\n\
+        if (im.ep_weather_object_url === final_img) {\n\
+            URL.revokeObjectURL(final_img);\n\
+            im.ep_weather_object_url = 0;\n\
+        }\n\
+    }, 10000);\n\
 }\n\
 }\n\
 ";
