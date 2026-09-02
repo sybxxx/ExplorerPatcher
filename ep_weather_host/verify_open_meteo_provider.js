@@ -3,6 +3,7 @@ const path = require('path');
 const vm = require('vm');
 
 const headerPath = path.join(__dirname, 'ep_weather_provider_open_meteo_html.h');
+const hostPath = path.join(__dirname, 'ep_weather_host.c');
 const source = fs.readFileSync(headerPath, 'utf8')
   .replace(/\r?\n/g, '\n')
   .replace(/\\\n/g, '');
@@ -31,6 +32,13 @@ for (const text of [
   'api.open-meteo.com',
   'geocode.arcgis.com',
   'photon.komoot.io/api',
+  'hourly=temperature_2m,precipitation_probability',
+  'precipitation_probability',
+  'hourlyContainer',
+  '.hour-prob',
+  'function contentHeight',
+  'getBoundingClientRect',
+  'height*367/353',
   'ep_pending',
   'ep_error',
   'state.requestId'
@@ -41,6 +49,14 @@ for (const text of [
 }
 if (html.includes('www.google.com/search')) {
   throw new Error('The deprecated Google weather search is still embedded.');
+}
+if (html.includes("+'#367#'")) {
+  throw new Error('The weather host height must be derived from the rendered content.');
+}
+
+const hostSource = fs.readFileSync(hostPath, 'utf8');
+if (!/ep_weather_provider_open_meteo_script[\s\S]*?\(int\)InterlockedAdd64\(&_this->cbx, 0\),\s*\(int\)InterlockedAdd64\(&_this->cby, 0\)/.test(hostSource)) {
+  throw new Error('The weather script must receive the taskbar icon height from cby.');
 }
 
 console.log(JSON.stringify({

@@ -821,7 +821,7 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_ExecuteDataScript(EPWeather* _this)
                     wszEscapedLanguage,
                     (int)InterlockedAdd64(&_this->dwTemperatureUnit, 0),
                     (int)InterlockedAdd64(&_this->cbx, 0),
-                    (int)InterlockedAdd64(&_this->cbx, 0)
+                    (int)InterlockedAdd64(&_this->cby, 0)
                 );
             }
             else
@@ -2443,7 +2443,7 @@ HRESULT STDMETHODCALLTYPE epw_Weather_SetIconSize(EPWeather* _this, LONG64 cbx, 
 {
     DWORD dwOldX = InterlockedAdd64(&_this->cbx, 0);
     DWORD dwOldY = InterlockedAdd64(&_this->cby, 0);
-    if (dwOldX != cbx)
+    if (dwOldX != cbx || dwOldY != cby)
     {
         InterlockedExchange64(&_this->cbx, cbx);
         InterlockedExchange64(&_this->cby, cby);
