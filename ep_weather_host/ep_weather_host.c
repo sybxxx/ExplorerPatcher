@@ -1447,6 +1447,17 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
         epw_Weather_RestartBrowser(_this);
         return 0;
     }
+    else if (uMsg == EP_WEATHER_WM_SET_BROWSER_VISIBILITY)
+    {
+        if (_this->pCoreWebView2Controller)
+        {
+            _this->pCoreWebView2Controller->lpVtbl->put_IsVisible(
+                _this->pCoreWebView2Controller,
+                (BOOL)wParam
+            );
+        }
+        return 0;
+    }
     else if (uMsg == WM_TIMER && wParam == EP_WEATHER_TIMER_REQUEST_REPAINT)
     {
         HWND hNotifyWnd = InterlockedAdd64(&_this->hNotifyWnd, 0);
@@ -2248,20 +2259,13 @@ HRESULT STDMETHODCALLTYPE epw_Weather_Show(EPWeather* _this)
     DwmSetWindowAttribute(_this->hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
     PostMessageW(_this->hWnd, EP_WEATHER_WM_REBOUND_BROWSER, 0, 0);
     ShowWindow(_this->hWnd, SW_SHOW);
-    if (_this->pCoreWebView2Controller)
-    {
-        _this->pCoreWebView2Controller->lpVtbl->put_IsVisible(_this->pCoreWebView2Controller, TRUE);
-    }
+    PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_BROWSER_VISIBILITY, TRUE, 0);
     _this->pTaskList->lpVtbl->DeleteTab(_this->pTaskList, _this->hWnd);
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE epw_Weather_Hide(EPWeather* _this)
 {
-    if (_this->pCoreWebView2Controller)
-    {
-        _this->pCoreWebView2Controller->lpVtbl->put_IsVisible(_this->pCoreWebView2Controller, FALSE);
-    }
     SetLastError(0);
     LONG_PTR dwExStyle = GetWindowLongPtrW(_this->hWnd, GWL_EXSTYLE);
     if (!GetLastError())
@@ -2269,6 +2273,7 @@ HRESULT STDMETHODCALLTYPE epw_Weather_Hide(EPWeather* _this)
         SetWindowLongPtrW(_this->hWnd, GWL_EXSTYLE, ~WS_EX_TOOLWINDOW & dwExStyle);
     }
     ShowWindow(_this->hWnd, SW_HIDE);
+    PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_BROWSER_VISIBILITY, FALSE, 0);
     return S_OK;
 }
 

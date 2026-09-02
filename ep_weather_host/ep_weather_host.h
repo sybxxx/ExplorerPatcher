@@ -39,6 +39,7 @@ DEFINE_GUID(IID_ITaskbarList,
 #define EP_WEATHER_TIMER_BROWSER_RETRY_DELAY 5000
 
 #define EP_WEATHER_WM_RESTART_BROWSER (WM_USER + 15)
+#define EP_WEATHER_WM_SET_BROWSER_VISIBILITY (WM_USER + 16)
 
 typedef struct _GenericObjectWithThis GenericObjectWithThis;
 
