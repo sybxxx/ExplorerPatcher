@@ -1,6 +1,6 @@
 #include "ep_weather_host.h"
-#include "ep_weather_provider_google_html.h"
-#include "ep_weather_provider_google_script.h"
+#include "ep_weather_provider_open_meteo_html.h"
+#include "ep_weather_provider_open_meteo_script.h"
 #include "ep_weather_error_html.h"
 
 #include <stdio.h>
@@ -757,30 +757,24 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_NavigateToProvider(EPWeather* _this)
     if (dwProvider == EP_WEATHER_PROVIDER_TEST)
     {
     }
-    else if (dwProvider == EP_WEATHER_PROVIDER_GOOGLE)
+    else if (dwProvider == EP_WEATHER_PROVIDER_OPEN_METEO)
     {
-        //hr = _this->pCoreWebView2->lpVtbl->Navigate(_this->pCoreWebView2, L"https://google.com");
-        LPWSTR wszScriptData = malloc(sizeof(WCHAR) * EP_WEATHER_PROVIDER_GOOGLE_HTML_LEN);
-        if (wszScriptData)
+        InterlockedExchange64(&_this->bIsNavigatingToError, FALSE);
+        _this->cntDataFetchAttempts = 0;
+        if (_this->pCoreWebView2)
         {
-            swprintf_s(wszScriptData, EP_WEATHER_PROVIDER_GOOGLE_HTML_LEN, L"https://www.google.com/search?hl=%s&q=weather%s%s", _this->wszLanguage, _this->wszTerm[0] ? L" " : L"", _this->wszTerm);
-            if (_this->pCoreWebView2)
-            {
-                hr = _this->pCoreWebView2->lpVtbl->Navigate(_this->pCoreWebView2, wszScriptData);
-            }
-            else
-            {
-                hr = E_FAIL;
-            }
-            if (FAILED(hr))
-            {
-                InterlockedExchange64(&_this->bBrowserBusy, FALSE);
-            }
-            free(wszScriptData);
+            hr = _this->pCoreWebView2->lpVtbl->NavigateToString(
+                _this->pCoreWebView2,
+                ep_weather_provider_open_meteo_html
+            );
         }
         else
         {
-            hr = E_OUTOFMEMORY;
+            hr = E_FAIL;
+        }
+        if (FAILED(hr))
+        {
+            InterlockedExchange64(&_this->bBrowserBusy, FALSE);
         }
     }
     return hr;
@@ -793,27 +787,64 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_ExecuteDataScript(EPWeather* _this)
     if (dwProvider == EP_WEATHER_PROVIDER_TEST)
     {
     }
-    else if (dwProvider == EP_WEATHER_PROVIDER_GOOGLE)
+    else if (dwProvider == EP_WEATHER_PROVIDER_OPEN_METEO)
     {
-        LPWSTR wszScriptData = malloc(sizeof(WCHAR) * EP_WEATHER_PROVIDER_GOOGLE_SCRIPT_LEN);
+        LPWSTR wszScriptData = malloc(sizeof(WCHAR) * EP_WEATHER_PROVIDER_OPEN_METEO_SCRIPT_LEN);
         if (wszScriptData)
         {
-            LONG64 dwIconPack = InterlockedAdd(&_this->dwIconPack, 0);
-            if (dwIconPack == EP_WEATHER_ICONPACK_MICROSOFT)
+            WCHAR wszEscapedTerm[MAX_PATH * 12];
+            WCHAR wszEscapedLanguage[MAX_PATH * 12];
+            DWORD cchEscapedTerm = ARRAYSIZE(wszEscapedTerm);
+            DWORD cchEscapedLanguage = ARRAYSIZE(wszEscapedLanguage);
+            HRESULT escapeHr = UrlEscapeW(
+                _this->wszTerm,
+                wszEscapedTerm,
+                &cchEscapedTerm,
+                URL_ESCAPE_URI_COMPONENT
+            );
+            if (SUCCEEDED(escapeHr))
             {
-                swprintf_s(wszScriptData, EP_WEATHER_PROVIDER_GOOGLE_SCRIPT_LEN, L"%s%s%s%s%s%s", ep_weather_provider_google_script00, ep_weather_provider_google_script010, ep_weather_provider_google_script011, ep_weather_provider_google_script020, ep_weather_provider_google_script021, ep_weather_provider_google_script03);
+                escapeHr = UrlEscapeW(
+                    _this->wszLanguage,
+                    wszEscapedLanguage,
+                    &cchEscapedLanguage,
+                    URL_ESCAPE_URI_COMPONENT
+                );
             }
-            else if (dwIconPack == EP_WEATHER_ICONPACK_GOOGLE)
+            if (SUCCEEDED(escapeHr))
             {
-                swprintf_s(wszScriptData, EP_WEATHER_PROVIDER_GOOGLE_SCRIPT_LEN, ep_weather_provider_google_script10);
+                swprintf_s(
+                    wszScriptData,
+                    EP_WEATHER_PROVIDER_OPEN_METEO_SCRIPT_LEN,
+                    ep_weather_provider_open_meteo_script,
+                    wszEscapedTerm,
+                    wszEscapedLanguage,
+                    (int)InterlockedAdd64(&_this->dwTemperatureUnit, 0),
+                    (int)InterlockedAdd64(&_this->cbx, 0),
+                    (int)InterlockedAdd64(&_this->cbx, 0)
+                );
             }
-            //wprintf(L"%s\n", _this->wszScriptData);
+            else
+            {
+                wszScriptData[0] = 0;
+                hr = escapeHr;
+            }
             if (_this->pCoreWebView2)
             {
                 GenericObjectWithThis* pCoreWebView2ExecuteScriptCompletedHandler =
                     GenericObjectWithThis_MakeAndInitialize(&EPWeather_ICoreWebView2ExecuteScriptCompletedHandlerVtbl, _this, L"pCoreWebView2ExecuteScriptCompletedHandler");
-                if (!pCoreWebView2ExecuteScriptCompletedHandler) hr = E_FAIL;
-                else hr = _this->pCoreWebView2->lpVtbl->ExecuteScript(_this->pCoreWebView2, wszScriptData, pCoreWebView2ExecuteScriptCompletedHandler);
+                if (!pCoreWebView2ExecuteScriptCompletedHandler)
+                {
+                    hr = E_FAIL;
+                }
+                else if (SUCCEEDED(hr))
+                {
+                    hr = _this->pCoreWebView2->lpVtbl->ExecuteScript(_this->pCoreWebView2, wszScriptData, pCoreWebView2ExecuteScriptCompletedHandler);
+                }
+                else
+                {
+                    pCoreWebView2ExecuteScriptCompletedHandler->lpVtbl->Release(pCoreWebView2ExecuteScriptCompletedHandler);
+                }
             }
             else
             {
@@ -845,7 +876,8 @@ HRESULT STDMETHODCALLTYPE _ep_Weather_ReboundBrowser(EPWeather* _this, LONG64 dw
     UINT dpi = GetDpiForWindow(_this->hWnd);
     RECT bounds;
     DWORD dwDevMode = InterlockedAdd64(&_this->dwDevMode, 0);
-    if (dwType || dwDevMode)
+    LONG64 dwProvider = InterlockedAdd64(&_this->dwProvider, 0);
+    if (dwType || dwDevMode || dwProvider == EP_WEATHER_PROVIDER_OPEN_METEO)
     {
         GetClientRect(_this->hWnd, &bounds);
     }
@@ -1056,7 +1088,7 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_NavigationCompleted(GenericObjectWithThi
 HRESULT STDMETHODCALLTYPE ICoreWebView2_ExecuteScriptCompleted(GenericObjectWithThis* _this2, HRESULT hr, LPCWSTR pResultObjectAsJson)
 {
     EPWeather* _this = _this2 ? _this2->_this : NULL; // GetWindowLongPtrW(FindWindowW(_T(EPW_WEATHER_CLASSNAME), NULL), GWLP_USERDATA);
-    if (!_this || !epw_Weather_IsCurrentBrowserCallback(_this2) || !pResultObjectAsJson)
+    if (!_this || !epw_Weather_IsCurrentBrowserCallback(_this2))
     {
         if (_this2)
         {
@@ -1064,46 +1096,37 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_ExecuteScriptCompleted(GenericObjectWith
         }
         return S_OK;
     }
+    if (FAILED(hr) || !pResultObjectAsJson)
+    {
+        printf("[Browser] Weather script failed: 0x%08x.\n", (unsigned int)hr);
+        _epw_Weather_NavigateToError(_this);
+        _this2->lpVtbl->Release(_this2);
+        return S_OK;
+    }
     if (_this)
     {
         BOOL bOk = FALSE;
         LONG64 dwProvider = InterlockedAdd64(&_this->dwProvider, 0);
-        if (dwProvider == EP_WEATHER_PROVIDER_GOOGLE)
+        if (dwProvider == EP_WEATHER_PROVIDER_OPEN_METEO)
         {
-            if (!_wcsicmp(pResultObjectAsJson, L"\"run_part_2\""))
+            if (!_wcsicmp(pResultObjectAsJson, L"\"ep_pending\""))
             {
-                //_this->pCoreWebView2->lpVtbl->OpenDevToolsWindow(_this->pCoreWebView2);
-
-                //printf("running part 2\n");
-                //LONG64 bEnabled, dwDarkMode;
-                //dwDarkMode = InterlockedAdd64(&_this->g_darkModeEnabled, 0);
-                //epw_Weather_IsDarkMode(_this, dwDarkMode, &bEnabled);
-                //swprintf_s(_this->wszScriptData, EP_WEATHER_PROVIDER_GOOGLE_SCRIPT_LEN, ep_weather_provider_google_script2, bEnabled ? 1 : 0);
-                GenericObjectWithThis* pCoreWebView2ExecuteScriptCompletedHandler =
-                    GenericObjectWithThis_MakeAndInitialize(&EPWeather_ICoreWebView2ExecuteScriptCompletedHandlerVtbl, _this, L"pCoreWebView2ExecuteScriptCompletedHandler");
-                if (pCoreWebView2ExecuteScriptCompletedHandler) _this->pCoreWebView2->lpVtbl->ExecuteScript(_this->pCoreWebView2, ep_weather_provider_google_script2, pCoreWebView2ExecuteScriptCompletedHandler);
-                bOk = TRUE;
-            }
-            else if (!_wcsicmp(pResultObjectAsJson, L"\"run_part_0\""))
-            {
-                LONG64 dwTemperatureUnit = InterlockedAdd64(&_this->dwTemperatureUnit, 0);
-                LONG64 cbx = InterlockedAdd64(&_this->cbx, 0);
-                LPWSTR wszScriptData = malloc(sizeof(WCHAR) * EP_WEATHER_PROVIDER_GOOGLE_SCRIPT_LEN);
-                if (wszScriptData)
+                DWORD attempts = ++_this->cntDataFetchAttempts;
+                if (attempts <= EP_WEATHER_OPEN_METEO_ATTEMPT_LIMIT)
                 {
-                    swprintf_s(wszScriptData, EP_WEATHER_PROVIDER_GOOGLE_SCRIPT_LEN, ep_weather_provider_google_script, dwTemperatureUnit == EP_WEATHER_TUNIT_FAHRENHEIT ? L'F' : L'C', cbx, cbx);
-                    GenericObjectWithThis* pCoreWebView2ExecuteScriptCompletedHandler =
-                        GenericObjectWithThis_MakeAndInitialize(&EPWeather_ICoreWebView2ExecuteScriptCompletedHandlerVtbl, _this, L"pCoreWebView2ExecuteScriptCompletedHandler");
-                    if (pCoreWebView2ExecuteScriptCompletedHandler) _this->pCoreWebView2->lpVtbl->ExecuteScript(_this->pCoreWebView2, wszScriptData, pCoreWebView2ExecuteScriptCompletedHandler);
-                    free(wszScriptData);
+                    SetTimer(_this->hWnd, EP_WEATHER_TIMER_EXECUTEDATASCRIPT, EP_WEATHER_TIMER_OPEN_METEO_RETRY_DELAY, NULL);
+                    _this2->lpVtbl->Release(_this2);
+                    return S_OK;
                 }
-                bOk = TRUE;
+                printf("[Weather] Open-Meteo request timed out after %u attempts.\n", attempts);
+                _epw_Weather_NavigateToError(_this);
+                _this2->lpVtbl->Release(_this2);
+                return S_OK;
             }
-            else if (!_wcsicmp(pResultObjectAsJson, L"\"run_part_1\""))
+            else if (!_wcsicmp(pResultObjectAsJson, L"\"ep_error\""))
             {
-                printf("consent granted\n");
-                PostMessageW(_this->hWnd, EP_WEATHER_WM_FETCH_DATA, 0, 0);
-                SetTimer(_this->hWnd, EP_WEATHER_TIMER_REQUEST_REFRESH, EP_WEATHER_TIMER_REQUEST_REFRESH_DELAY * 5, NULL);
+                printf("[Weather] Open-Meteo request failed.\n");
+                _epw_Weather_NavigateToError(_this);
                 _this2->lpVtbl->Release(_this2);
                 return S_OK;
             }
@@ -1242,6 +1265,7 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_ExecuteScriptCompleted(GenericObjectWith
         else
         {
             GetLocalTime(&stLastUpdate);
+            _this->cntDataFetchAttempts = 0;
             HWND hGUI = FindWindowW(L"ExplorerPatcher_GUI_" _T(EP_CLSID), NULL);
             if (hGUI) InvalidateRect(hGUI, NULL, TRUE);
             InterlockedExchange64(&_this->bBrowserBusy, FALSE);
@@ -1495,19 +1519,14 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
     }
     else if (uMsg == WM_TIMER && wParam == EP_WEATHER_TIMER_RESIZE_WINDOW)
     {
-        LPWSTR uri = NULL;
-        if (_this->pCoreWebView2)
-        {
-            _this->pCoreWebView2->lpVtbl->get_Source(_this->pCoreWebView2, &uri);
-        }
         DWORD dwTextScaleFactor = epw_Weather_GetTextScaleFactor(_this);
         DWORD dwZoomFactor = epw_Weather_GetZoomFactor(_this);
         UINT dpi = GetDpiForWindow(_this->hWnd);
         RECT rcAdj;
-        SetRect(&rcAdj, 0, 0, MulDiv(MulDiv(MulDiv(EP_WEATHER_WIDTH, dpi, 96), dwTextScaleFactor, 100), dwZoomFactor, 100), MulDiv(MulDiv(MulDiv((!wcscmp(L"about:blank", uri ? uri : L"") ? EP_WEATHER_HEIGHT_ERROR : EP_WEATHER_HEIGHT), dpi, 96), dwTextScaleFactor, 100), dwZoomFactor, 100));
+        LONG64 bIsErrorPage = InterlockedAdd64(&_this->bIsNavigatingToError, 0);
+        SetRect(&rcAdj, 0, 0, MulDiv(MulDiv(MulDiv(EP_WEATHER_WIDTH, dpi, 96), dwTextScaleFactor, 100), dwZoomFactor, 100), MulDiv(MulDiv(MulDiv((bIsErrorPage ? EP_WEATHER_HEIGHT_ERROR : EP_WEATHER_HEIGHT), dpi, 96), dwTextScaleFactor, 100), dwZoomFactor, 100));
         AdjustWindowRectExForDpi(&rcAdj, epw_Weather_GetStyle(_this) & ~WS_OVERLAPPED, epw_Weather_HasMenuBar(_this), epw_Weather_GetExtendedStyle(_this), dpi);
         SetWindowPos(_this->hWnd, NULL, 0, 0, rcAdj.right - rcAdj.left, rcAdj.bottom - rcAdj.top, SWP_NOMOVE | SWP_NOSENDCHANGING);
-        CoTaskMemFree(uri);
         if (_this->cntResizeWindow == 7)
         {
             _this->cntResizeWindow = 0;
@@ -1527,13 +1546,10 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
     }
     else if (uMsg == EP_WEATHER_WM_REBOUND_BROWSER)
     {
-        LPWSTR uri = NULL;
-        if (_this->pCoreWebView2)
-        {
-            _this->pCoreWebView2->lpVtbl->get_Source(_this->pCoreWebView2, &uri);
-        }
-        _ep_Weather_ReboundBrowser(_this, !wcscmp(L"about:blank", uri ? uri : L""));
-        CoTaskMemFree(uri);
+        _ep_Weather_ReboundBrowser(
+            _this,
+            InterlockedAdd64(&_this->bIsNavigatingToError, 0)
+        );
         return 0;
     }
     else if (uMsg == EP_WEATHER_WM_FETCH_DATA)

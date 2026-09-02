@@ -41,10 +41,10 @@
     <ClInclude Include="ep_weather_utility.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ep_weather_provider_google_script.h">
+    <ClInclude Include="ep_weather_provider_open_meteo_html.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ep_weather_provider_google_html.h">
+    <ClInclude Include="ep_weather_provider_open_meteo_script.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ep_weather_error_html.h">

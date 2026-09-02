@@ -303,8 +303,8 @@
     <ClInclude Include="ep_weather_error_html.h" />
     <ClInclude Include="ep_weather_factory.h" />
     <ClInclude Include="ep_weather_host.h" />
-    <ClInclude Include="ep_weather_provider_google_html.h" />
-    <ClInclude Include="ep_weather_provider_google_script.h" />
+    <ClInclude Include="ep_weather_provider_open_meteo_html.h" />
+    <ClInclude Include="ep_weather_provider_open_meteo_script.h" />
     <ClInclude Include="ep_weather_utility.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>

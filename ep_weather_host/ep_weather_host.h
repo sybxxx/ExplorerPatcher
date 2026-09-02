@@ -16,6 +16,7 @@
 #pragma comment(lib, "uxtheme.lib")
 #include <ShellScalingApi.h>
 #include <shlwapi.h>
+#pragma comment(lib, "Shlwapi.lib")
 #include <psapi.h>
 #pragma comment(lib, "Psapi.lib")
 
@@ -37,6 +38,8 @@ DEFINE_GUID(IID_ITaskbarList,
 #define EP_WEATHER_TIMER_BROWSER_RETRY 22
 #define EP_WEATHER_TIMER_MEMORY_GUARD_INTERVAL 30000
 #define EP_WEATHER_TIMER_BROWSER_RETRY_DELAY 5000
+#define EP_WEATHER_TIMER_OPEN_METEO_RETRY_DELAY 500
+#define EP_WEATHER_OPEN_METEO_ATTEMPT_LIMIT 60
 
 #define EP_WEATHER_WM_RESTART_BROWSER (WM_USER + 15)
 #define EP_WEATHER_WM_SET_BROWSER_VISIBILITY (WM_USER + 16)
@@ -110,6 +113,7 @@ typedef interface EPWeather
     FARPROC SHRegGetValueFromHKCUHKLMFunc;
     LONG64 cbGenericObject;
     WCHAR wszUserDataFolder[MAX_PATH];
+    DWORD cntDataFetchAttempts;
 
     /**/HANDLE hSignalExitMainThread;//
     /**/HANDLE hSignalKillSwitch;//

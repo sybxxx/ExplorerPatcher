@@ -265,7 +265,7 @@ BEGIN
 
     IDS_WEATHER_SHOW            "Show Weather on the taskbar"
     IDS_WEATHER_LOC             "Location"
-    IDS_WEATHER_LOC_PROMPT      "Search City or Zip Code; the program looks up ""weather in /* what you typed */"" on Google. Leave blank for the default value (current location)."
+    IDS_WEATHER_LOC_PROMPT      "Search City or Zip Code; the program uses the entered location to retrieve weather information. Leave blank for the default value (current location)."
     IDS_WEATHER_LOC_DEFAULT     "Current location (default)"
     IDS_WEATHER_LAYOUT          "Layout"
     IDS_WEATHER_LAYOUT_0        "Icon and description (default)"
