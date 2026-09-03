@@ -336,18 +336,39 @@ function alertBlock(label, content) {
   return block;
 }
 
+function alertIdentity(alert, index) {
+  const id = textValue(alert && alert.id);
+  if (id) return `id:${id}`;
+  const fallback = [
+    alert && alert.type,
+    alert && alert.title,
+    alert && alert.published,
+    alert && alert.start,
+    alert && alert.end
+  ].map((value) => textValue(value)).join('|');
+  return fallback || `index:${index}`;
+}
+
 function renderAlerts() {
   const value = labels();
   const data = state.mode === 'qweather' && state.datasets.alerts && state.datasets.alerts.data;
   const alerts = data && Array.isArray(data.items) ? data.items : [];
+  const previousState = new Map();
+  for (const details of elements.alerts.querySelectorAll('details.alert[data-alert-key]')) {
+    previousState.set(details.dataset.alertKey, details.open);
+  }
   elements.alerts.replaceChildren();
   elements.alerts.hidden = alerts.length === 0;
-  for (const alert of alerts) {
+  for (const [index, alert] of alerts.entries()) {
     const details = document.createElement('details');
     const color = alertColor(alert);
+    const key = alertIdentity(alert, index);
     details.className = 'alert';
+    details.dataset.alertKey = key;
     details.style.setProperty('--alert-color', color);
-    details.open = color === '#b3261e' || color === '#c55318';
+    details.open = previousState.has(key)
+      ? previousState.get(key)
+      : color === '#b3261e' || color === '#c55318';
     const summary = document.createElement('summary');
     const level = document.createElement('span');
     level.className = 'alert-level';

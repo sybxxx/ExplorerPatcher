@@ -53,6 +53,9 @@ The page no longer reports its document height to resize the native window. The
 24-hour strip can be dragged or scrolled horizontally, but it never intercepts
 the normal vertical mouse wheel used to move through the popup.
 
+Alert cards retain each alert's expanded or collapsed state across background
+data refreshes. A refresh that finds no dataset due does not rebuild the page.
+
 ## Source and verification
 
 The maintainable provider sources are:

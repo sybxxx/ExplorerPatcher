@@ -436,8 +436,9 @@ async function fetchQDataset(name, force, generation) {
 }
 
 async function refreshQWeather(force, generation) {
-  if (!state.apiHost || !state.coords || state.qAuthFailed || generation !== state.generation) return;
-  await Promise.allSettled(DATASET_NAMES.map((name) => fetchQDataset(name, force, generation)));
+  if (!state.apiHost || !state.coords || state.qAuthFailed || generation !== state.generation) return false;
+  const results = await Promise.allSettled(DATASET_NAMES.map((name) => fetchQDataset(name, force, generation)));
+  return results.some((result) => result.status === 'rejected' || result.value !== null);
 }
 
 async function resolveQWeatherLocation(query, generation) {
@@ -563,15 +564,15 @@ function normalizeOpenMeteo(raw) {
 
 async function refreshFallback(force, generation) {
   const now = Date.now();
-  if (!state.coords || generation !== state.generation || state.inFlight.fallback) return;
-  if (!force && now < state.fallbackDue) return;
+  if (!state.coords || generation !== state.generation || state.inFlight.fallback) return false;
+  if (!force && now < state.fallbackDue) return false;
   state.inFlight.fallback = true;
   try {
     const lat = state.coords.lat.toFixed(5);
     const lon = state.coords.lon.toFixed(5);
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m,precipitation,surface_pressure,visibility,cloud_cover,dew_point_2m&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,weather_code,is_day,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=5&wind_speed_unit=kmh`;
     const normalized = normalizeOpenMeteo(await getJson(url));
-    if (generation !== state.generation) return;
+    if (generation !== state.generation) return false;
     state.fallback = { data: normalized, fetchedAt: Date.now() };
     state.fallbackDue = Date.now() + FALLBACK_TTL;
     state.fallbackFailureCount = 0;
@@ -581,6 +582,7 @@ async function refreshFallback(force, generation) {
       state.status = 'ready';
     }
     scheduleRenderAndCapture(true);
+    return true;
   } catch (error) {
     if (generation === state.generation) {
       state.errors.fallback = error && error.message || String(error);
@@ -598,18 +600,22 @@ async function refreshFallback(force, generation) {
 
 async function refreshDue(force, generation = state.generation) {
   if (generation !== state.generation || !state.coords) return;
-  if (state.apiHost && !state.qAuthFailed) await refreshQWeather(force, generation);
+  let changed = false;
+  if (state.apiHost && !state.qAuthFailed) {
+    changed = await refreshQWeather(force, generation) || changed;
+  }
   const hasQCurrent = state.datasets.current && state.datasets.current.data.temp !== null;
   if (!hasQCurrent) {
     try {
-      await refreshFallback(force, generation);
+      changed = await refreshFallback(force, generation) || changed;
     } catch (error) {
       // Keep the last valid data and the bounded retry schedule.
+      changed = true;
     }
   }
   if (generation === state.generation) {
-    renderWeather();
     if (hasCurrentData()) state.status = 'ready';
+    if (changed) renderWeather();
   }
 }
 
