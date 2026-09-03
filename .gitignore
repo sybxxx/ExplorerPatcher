@@ -3,6 +3,7 @@ ep_private.h
 .playwright-cli/
 .workflow/
 output/playwright/
+output/package-autolocation*/
 ep_taskbar*/
 b*.bat
 c*.bat

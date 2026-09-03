@@ -11,6 +11,7 @@ const DATASET_NAMES = Object.freeze(['current', 'minutely', 'alerts', 'hourly', 
 const FALLBACK_TTL = 10 * 60 * 1000;
 const FAILURE_RETRY_DELAY = 2 * 60 * 1000;
 const RATE_LIMIT_BACKOFF = 15 * 60 * 1000;
+const AUTO_LOCATION_REQUEST_TIMEOUT = 12 * 1000;
 
 const state = {
   key: '',
@@ -39,6 +40,9 @@ const state = {
   iconWidth: 32,
   iconHeight: 32
 };
+
+const autoLocationWaiters = new Map();
+let autoLocationSequence = 0;
 
 class HttpError extends Error {
   constructor(status, message, retryAfterMs) {
@@ -160,6 +164,106 @@ async function getJson(url, options = {}) {
     await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
   }
   throw lastError || new Error('Network request failed');
+}
+
+function clearAutoLocationWaiters() {
+  for (const waiter of autoLocationWaiters.values()) {
+    clearTimeout(waiter.timer);
+    waiter.reject(new Error('Superseded location request'));
+  }
+  autoLocationWaiters.clear();
+}
+
+function handleNativeWeatherMessage(event) {
+  const message = textValue(event && event.data);
+  const resultPrefix = 'ep_weather_auto_location_result|';
+  const errorPrefix = 'ep_weather_auto_location_error|';
+  const prefix = message.startsWith(resultPrefix) ? resultPrefix
+    : message.startsWith(errorPrefix) ? errorPrefix : '';
+  if (!prefix) return false;
+  const separator = message.indexOf('|', prefix.length);
+  if (separator < 0) return false;
+  const requestId = message.slice(prefix.length, separator);
+  const waiter = autoLocationWaiters.get(requestId);
+  if (!waiter) return false;
+  autoLocationWaiters.delete(requestId);
+  clearTimeout(waiter.timer);
+  if (waiter.generation !== state.generation) {
+    waiter.reject(new Error('Superseded location request'));
+    return true;
+  }
+  if (prefix === errorPrefix) {
+    waiter.reject(new Error('Direct IP location unavailable'));
+    return true;
+  }
+  try {
+    const payload = JSON.parse(message.slice(separator + 1));
+    if (!payload || payload.ok !== true) throw new Error('Direct IP location unavailable');
+    waiter.resolve(payload);
+  } catch (error) {
+    waiter.reject(new Error('Invalid direct IP location response'));
+  }
+  return true;
+}
+
+function requestDirectIpLocation(generation) {
+  if (generation !== state.generation) {
+    return Promise.reject(new Error('Superseded location request'));
+  }
+  const webview = window.chrome && window.chrome.webview;
+  if (!webview || typeof webview.postMessage !== 'function') {
+    return Promise.reject(new Error('Direct IP location requires the native weather host'));
+  }
+  const requestId = `${Date.now().toString(36)}-${(++autoLocationSequence).toString(36)}`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      autoLocationWaiters.delete(requestId);
+      reject(new Error('Direct IP location timed out'));
+    }, AUTO_LOCATION_REQUEST_TIMEOUT);
+    autoLocationWaiters.set(requestId, { generation, resolve, reject, timer });
+    try {
+      webview.postMessage(`ep_weather_auto_location|${requestId}`);
+    } catch (error) {
+      clearTimeout(timer);
+      autoLocationWaiters.delete(requestId);
+      reject(new Error('Direct IP location unavailable'));
+    }
+  });
+}
+
+function normalizeDirectIpLocation(raw) {
+  const latitude = finiteNumber(raw && raw.latitude);
+  const longitude = finiteNumber(raw && raw.longitude);
+  if (latitude === null || longitude === null || latitude < -90 || latitude > 90 ||
+      longitude < -180 || longitude > 180) {
+    throw new Error('Invalid direct IP location');
+  }
+  const city = textValue(raw && raw.city);
+  const region = textValue(raw && raw.region);
+  const country = textValue(raw && raw.country);
+  return {
+    lat: latitude,
+    lon: longitude,
+    name: city || region || country || 'Current location',
+    city,
+    province: region,
+    country,
+    source: 'Direct IP'
+  };
+}
+
+async function resolveAutomaticLocation(generation) {
+  const direct = normalizeDirectIpLocation(await requestDirectIpLocation(generation));
+  if (state.apiHost && !state.qAuthFailed) {
+    try {
+      const resolved = await resolveQWeatherLocation(`${direct.lon},${direct.lat}`, generation);
+      return { ...resolved, source: 'Direct IP + QWeather' };
+    } catch (error) {
+      const status = Number(error && error.status) || 0;
+      if (status === 401 || status === 403) state.qAuthFailed = true;
+    }
+  }
+  return direct;
 }
 
 function qweatherResponse(data) {
@@ -629,7 +733,9 @@ async function initializeWeather(generation) {
   state.status = 'loading';
   setLoading();
   try {
-    const place = await resolveLocation(generation);
+    const place = state.location
+      ? await resolveLocation(generation)
+      : await resolveAutomaticLocation(generation);
     if (generation !== state.generation) return;
     state.coords = { lat: place.lat, lon: place.lon };
     state.place = place;
@@ -645,6 +751,7 @@ async function initializeWeather(generation) {
 
 function resetState() {
   ++state.generation;
+  clearAutoLocationWaiters();
   state.status = 'idle';
   state.mode = 'none';
   state.coords = null;
@@ -664,4 +771,13 @@ function resetState() {
   state.refreshTimer = setInterval(() => {
     refreshDue(false).catch(() => {});
   }, 60 * 1000);
+}
+
+try {
+  if (window.chrome && window.chrome.webview &&
+      typeof window.chrome.webview.addEventListener === 'function') {
+    window.chrome.webview.addEventListener('message', handleNativeWeatherMessage);
+  }
+} catch (error) {
+  // Standalone previews do not provide the native WebView host.
 }

@@ -45,6 +45,12 @@ for (const text of [
   '/weatheralert/v1/current/',
   '/airquality/v1/current/',
   '/geo/v2/city/lookup',
+  'ep_weather_auto_location|',
+  'requestDirectIpLocation',
+  'normalizeDirectIpLocation',
+  'resolveAutomaticLocation',
+  'AUTO_LOCATION_REQUEST_TIMEOUT',
+  'Direct IP',
   'Promise.allSettled',
   'AbortController',
   'DATASET_TTL',
@@ -88,6 +94,8 @@ for (const text of [
   'notifyNativeTheme',
   'ep_weather_theme_dark',
   'ep_weather_theme_light',
+  'ep_weather_auto_location_result|',
+  'ep_weather_auto_location_error|',
   'MANUAL_REFRESH_COOLDOWN',
   'refreshWeatherNow',
   'hero-range',
@@ -160,7 +168,8 @@ const sandbox = {
 vm.createContext(sandbox);
 vm.runInContext(`${dataSource}\n;globalThis.weatherTests = {
   normalizeQCurrent, normalizeQHourly, normalizeQDaily, normalizeQMinutely,
-  normalizeQAlerts, normalizeQAir, normalizeOpenMeteo, validQWeatherHost
+  normalizeQAlerts, normalizeQAir, normalizeOpenMeteo, validQWeatherHost,
+  normalizeDirectIpLocation
 };`, sandbox);
 const normalizers = sandbox.weatherTests;
 
@@ -232,11 +241,31 @@ assert.strictEqual(air.aqi, 42);
 assert.strictEqual(air.pollutants[0].value, 12);
 assert.strictEqual(air.advice, 'Good');
 
+const directLocation = normalizers.normalizeDirectIpLocation({
+  latitude: 26.89,
+  longitude: 112.57,
+  city: '\u8861\u9633\u5e02',
+  region: '\u6e56\u5357\u7701',
+  country: '\u4e2d\u56fd'
+});
+assert.strictEqual(directLocation.lat, 26.89);
+assert.strictEqual(directLocation.lon, 112.57);
+assert.strictEqual(directLocation.name, '\u8861\u9633\u5e02');
+assert.strictEqual(directLocation.city, '\u8861\u9633\u5e02');
+assert.strictEqual(directLocation.province, '\u6e56\u5357\u7701');
+assert.strictEqual(directLocation.country, '\u4e2d\u56fd');
+assert.strictEqual(directLocation.source, 'Direct IP');
+assert.throws(
+  () => normalizers.normalizeDirectIpLocation({ latitude: 91, longitude: 112 }),
+  /Invalid direct IP location/
+);
+
 assert.strictEqual(normalizers.validQWeatherHost('abc123.qweatherapi.com'), true);
 assert.strictEqual(normalizers.validQWeatherHost('qweatherapi.com.evil.example'), false);
 assert.strictEqual(normalizers.validQWeatherHost('https://abc123.qweatherapi.com'), false);
 
 const hostSource = fs.readFileSync(hostPath, 'utf8');
+const locationSource = fs.readFileSync(path.join(root, 'ep_weather_location.cpp'), 'utf8');
 assert.match(
   hostSource,
   /InterlockedExchange64\(&_this->bAllowEmbeddedNavigation, TRUE\)[\s\S]*?NavigateToString/
@@ -277,6 +306,19 @@ for (const text of [
 ]) {
   if (!hostSource.includes(text)) throw new Error(`Missing native host protection: ${text}`);
 }
+for (const text of [
+  'INTERNET_OPEN_TYPE_DIRECT',
+  'https://ipwho.is/',
+  'INTERNET_OPTION_CONNECT_TIMEOUT',
+  'GetNamedNumber',
+  'EP_WEATHER_WM_AUTO_LOCATION_RESULT',
+  'EPWeather_BeginDirectIpLocation'
+]) {
+  if (!locationSource.includes(text) && !hostSource.includes(text)) {
+    throw new Error(`Missing direct IP location protection: ${text}`);
+  }
+}
+assert.ok(!locationSource.includes('INTERNET_OPEN_TYPE_PRECONFIG'), 'Direct IP lookup must not use the system proxy');
 
 const configSource = fs.readFileSync(configPath, 'utf8');
 for (const text of ['CryptProtectData', 'CryptUnprotectData', 'REG_BINARY', '.qweatherapi.com']) {

@@ -24,6 +24,187 @@ static BOOL epw_Weather_GetWebViewMemory(SIZE_T* privateBytes, SIZE_T* workingSe
 static void epw_Weather_RequestBrowserRestart(EPWeather* _this);
 static HRESULT epw_Weather_NavigateToString(EPWeather* _this, LPCWSTR htmlContent);
 static void epw_Weather_ApplyNativeThemeColors(EPWeather* _this, BOOL dark);
+static void epw_Weather_ResetAutoLocationRequest(EPWeather* _this);
+static HRESULT epw_Weather_PostAutoLocationError(EPWeather* _this, LPCWSTR requestId);
+static HRESULT epw_Weather_PostAutoLocationResult(EPWeather* _this, EPWeatherDirectLocationResult* result);
+
+static BOOL epw_Weather_AppendWideChar(
+    WCHAR* buffer,
+    size_t capacity,
+    size_t* offset,
+    WCHAR value
+)
+{
+    if (!buffer || !offset || *offset + 1 >= capacity)
+    {
+        return FALSE;
+    }
+    buffer[*offset] = value;
+    (*offset)++;
+    buffer[*offset] = L'\0';
+    return TRUE;
+}
+
+static BOOL epw_Weather_AppendJsonString(
+    WCHAR* buffer,
+    size_t capacity,
+    size_t* offset,
+    LPCWSTR value
+)
+{
+    if (!epw_Weather_AppendWideChar(buffer, capacity, offset, L'"'))
+    {
+        return FALSE;
+    }
+    for (LPCWSTR current = value ? value : L""; *current; ++current)
+    {
+        WCHAR character = *current;
+        if (character == L'"' || character == L'\\')
+        {
+            if (!epw_Weather_AppendWideChar(buffer, capacity, offset, L'\\') ||
+                !epw_Weather_AppendWideChar(buffer, capacity, offset, character))
+            {
+                return FALSE;
+            }
+        }
+        else if (character == L'\b' || character == L'\f' || character == L'\n' ||
+            character == L'\r' || character == L'\t')
+        {
+            WCHAR escaped = character == L'\b' ? L'b' :
+                character == L'\f' ? L'f' :
+                character == L'\n' ? L'n' :
+                character == L'\r' ? L'r' : L't';
+            if (!epw_Weather_AppendWideChar(buffer, capacity, offset, L'\\') ||
+                !epw_Weather_AppendWideChar(buffer, capacity, offset, escaped))
+            {
+                return FALSE;
+            }
+        }
+        else if (character < 0x20)
+        {
+            if (*offset + 6 >= capacity)
+            {
+                return FALSE;
+            }
+            int written = swprintf_s(
+                buffer + *offset,
+                capacity - *offset,
+                L"\\u%04x",
+                (unsigned int)character
+            );
+            if (written < 0)
+            {
+                return FALSE;
+            }
+            *offset += written;
+        }
+        else if (!epw_Weather_AppendWideChar(buffer, capacity, offset, character))
+        {
+            return FALSE;
+        }
+    }
+    return epw_Weather_AppendWideChar(buffer, capacity, offset, L'"');
+}
+
+static void epw_Weather_ResetAutoLocationRequest(EPWeather* _this)
+{
+    if (!_this)
+    {
+        return;
+    }
+    InterlockedExchange64(&_this->bAutoLocationInFlight, FALSE);
+    _this->dwAutoLocationBrowserGeneration = 0;
+    ZeroMemory(_this->wszAutoLocationRequestId, sizeof(_this->wszAutoLocationRequestId));
+}
+
+static HRESULT epw_Weather_PostAutoLocationError(EPWeather* _this, LPCWSTR requestId)
+{
+    if (!_this || !_this->pCoreWebView2 || !requestId || !requestId[0])
+    {
+        return E_INVALIDARG;
+    }
+
+    WCHAR message[256];
+    int written = swprintf_s(
+        message,
+        ARRAYSIZE(message),
+        L"ep_weather_auto_location_error|%s|direct_lookup_failed",
+        requestId
+    );
+    if (written < 0)
+    {
+        return E_FAIL;
+    }
+    return _this->pCoreWebView2->lpVtbl->PostWebMessageAsString(
+        _this->pCoreWebView2,
+        message
+    );
+}
+
+static HRESULT epw_Weather_PostAutoLocationResult(
+    EPWeather* _this,
+    EPWeatherDirectLocationResult* result
+)
+{
+    if (!_this || !_this->pCoreWebView2 || !result || !result->requestId[0])
+    {
+        return E_INVALIDARG;
+    }
+
+    WCHAR message[4096];
+    size_t offset = 0;
+    int written = swprintf_s(
+        message,
+        ARRAYSIZE(message),
+        L"ep_weather_auto_location_result|%s|{\"ok\":%s,\"latitude\":%.8f,\"longitude\":%.8f,\"city\":",
+        result->requestId,
+        result->success ? L"true" : L"false",
+        result->latitude,
+        result->longitude
+    );
+    if (written < 0)
+    {
+        return E_FAIL;
+    }
+    offset = (size_t)written;
+    if (!epw_Weather_AppendJsonString(message, ARRAYSIZE(message), &offset, result->city))
+    {
+        return E_FAIL;
+    }
+    written = swprintf_s(
+        message + offset,
+        ARRAYSIZE(message) - offset,
+        L",\"region\":"
+    );
+    if (written < 0)
+    {
+        return E_FAIL;
+    }
+    offset += (size_t)written;
+    if (!epw_Weather_AppendJsonString(message, ARRAYSIZE(message), &offset, result->region))
+    {
+        return E_FAIL;
+    }
+    written = swprintf_s(
+        message + offset,
+        ARRAYSIZE(message) - offset,
+        L",\"country\":"
+    );
+    if (written < 0)
+    {
+        return E_FAIL;
+    }
+    offset += (size_t)written;
+    if (!epw_Weather_AppendJsonString(message, ARRAYSIZE(message), &offset, result->country) ||
+        !epw_Weather_AppendWideChar(message, ARRAYSIZE(message), &offset, L'}'))
+    {
+        return E_FAIL;
+    }
+    return _this->pCoreWebView2->lpVtbl->PostWebMessageAsString(
+        _this->pCoreWebView2,
+        message
+    );
+}
 
 static void epw_Weather_ApplyNativeThemeColors(EPWeather* _this, BOOL dark)
 {
@@ -588,6 +769,9 @@ static HRESULT epw_Weather_RestartBrowser(EPWeather* _this)
     }
 
     InterlockedExchange64(&_this->bBrowserRestartPending, FALSE);
+    // A result from the old document must not satisfy a new document's
+    // auto-location request after a WebView2 restart.
+    epw_Weather_ResetAutoLocationRequest(_this);
     InterlockedIncrement64(&_this->dwBrowserGeneration);
     InterlockedExchange64(&_this->bBrowserBusy, TRUE);
     InterlockedExchange64(&_this->bIsNavigatingToError, FALSE);
@@ -1253,7 +1437,46 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
     LPWSTR message = NULL;
     if (SUCCEEDED(args->lpVtbl->TryGetWebMessageAsString(args, &message)) && message)
     {
-        if (!_wcsicmp(message, L"ep_weather_theme_dark"))
+        static const WCHAR autoLocationPrefix[] = L"ep_weather_auto_location|";
+        size_t autoLocationPrefixLength = ARRAYSIZE(autoLocationPrefix) - 1;
+        if (!_wcsnicmp(message, autoLocationPrefix, autoLocationPrefixLength))
+        {
+            LPCWSTR requestId = message + autoLocationPrefixLength;
+            size_t requestIdLength = wcsnlen_s(
+                requestId,
+                EP_WEATHER_AUTO_LOCATION_REQUEST_ID_MAX
+            );
+            if (requestIdLength && requestIdLength < EP_WEATHER_AUTO_LOCATION_REQUEST_ID_MAX &&
+                InterlockedCompareExchange64(&_this->bAutoLocationInFlight, TRUE, FALSE) == FALSE)
+            {
+                wcscpy_s(
+                    _this->wszAutoLocationRequestId,
+                    ARRAYSIZE(_this->wszAutoLocationRequestId),
+                    requestId
+                );
+                _this->dwAutoLocationBrowserGeneration =
+                    InterlockedAdd64(&_this->dwBrowserGeneration, 0);
+                HRESULT locationHr = EPWeather_BeginDirectIpLocation(
+                    _this->hWnd,
+                    _this->dwAutoLocationBrowserGeneration,
+                    requestId
+                );
+                if (FAILED(locationHr))
+                {
+                    printf(
+                        "[AutoLocation] Failed to start direct IP lookup: 0x%08x.\n",
+                        (unsigned int)locationHr
+                    );
+                    epw_Weather_PostAutoLocationError(_this, requestId);
+                    epw_Weather_ResetAutoLocationRequest(_this);
+                }
+                else
+                {
+                    printf("[AutoLocation] Direct IP lookup started.\n");
+                }
+            }
+        }
+        else if (!_wcsicmp(message, L"ep_weather_theme_dark"))
         {
             // Apply the page-selected theme on the window thread so the native
             // caption/backdrop stays in sync with the embedded document.
@@ -1747,6 +1970,48 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
     {
         InterlockedExchange64(&_this->bBrowserRestartPending, FALSE);
         epw_Weather_RestartBrowser(_this);
+        return 0;
+    }
+    else if (uMsg == EP_WEATHER_WM_AUTO_LOCATION_RESULT)
+    {
+        EPWeatherDirectLocationResult* result = (EPWeatherDirectLocationResult*)lParam;
+        BOOL requestMatches = result &&
+            InterlockedAdd64(&_this->bAutoLocationInFlight, 0) &&
+            !_wcsicmp(result->requestId, _this->wszAutoLocationRequestId) &&
+            result->browserGeneration == _this->dwAutoLocationBrowserGeneration;
+        if (requestMatches)
+        {
+            BOOL currentBrowser = result->browserGeneration ==
+                InterlockedAdd64(&_this->dwBrowserGeneration, 0);
+            if (currentBrowser && _this->pCoreWebView2)
+            {
+                HRESULT postHr = epw_Weather_PostAutoLocationResult(_this, result);
+                if (FAILED(postHr))
+                {
+                    printf(
+                        "[AutoLocation] Failed to deliver direct IP result: 0x%08x.\n",
+                        (unsigned int)postHr
+                    );
+                }
+                else if (result->success)
+                {
+                    printf(
+                        "[AutoLocation] Direct IP location resolved: %.4f, %.4f.\n",
+                        result->latitude,
+                        result->longitude
+                    );
+                }
+            }
+            else
+            {
+                printf("[AutoLocation] Ignored a stale direct IP result.\n");
+            }
+            epw_Weather_ResetAutoLocationRequest(_this);
+        }
+        if (result)
+        {
+            CoTaskMemFree(result);
+        }
         return 0;
     }
     else if (uMsg == EP_WEATHER_WM_SET_BROWSER_VISIBILITY)
@@ -2741,6 +3006,7 @@ HRESULT STDMETHODCALLTYPE epw_Weather_SetUpdateSchedule(EPWeather* _this, LONG64
 
 HRESULT STDMETHODCALLTYPE epw_Weather_SetTerm(EPWeather* _this, DWORD cbTerm, LPCWSTR wszTerm)
 {
+    epw_Weather_ResetAutoLocationRequest(_this);
     if (cbTerm)
     {
         memcpy_s(_this->wszTerm, sizeof(WCHAR) * MAX_PATH, wszTerm, cbTerm);

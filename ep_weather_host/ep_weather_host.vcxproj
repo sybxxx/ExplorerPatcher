@@ -296,6 +296,9 @@
     <ClCompile Include="ep_weather.c" />
     <ClCompile Include="ep_weather_factory.c" />
     <ClCompile Include="ep_weather_host.c" />
+    <ClCompile Include="ep_weather_location.cpp">
+      <CompileAs>CompileAsCpp</CompileAs>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ep_weather_host_stub\$(Platform)\$(Configuration)\ep_weather_host_h.h" />
@@ -305,6 +308,7 @@
     <ClInclude Include="ep_weather_error_html.h" />
     <ClInclude Include="ep_weather_factory.h" />
     <ClInclude Include="ep_weather_host.h" />
+    <ClInclude Include="ep_weather_location.h" />
     <ClInclude Include="ep_weather_provider_open_meteo_html.h" />
     <ClInclude Include="ep_weather_provider_open_meteo_script.h" />
     <ClInclude Include="ep_weather_utility.h" />

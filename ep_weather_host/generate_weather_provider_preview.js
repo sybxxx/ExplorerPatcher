@@ -37,7 +37,20 @@ const mockBootstrap = String.raw`<script>
     esri: { candidates: [{ location: { x: 112.57, y: 26.89 }, attributes: { ShortLabel: '\u84b8\u6e58\u533a', City: '\u8861\u9633\u5e02', Country: '\u4e2d\u56fd' } }] },
     openMeteo: { current: { time: '2026-09-02T14:00', temperature_2m: 28, apparent_temperature: 31, relative_humidity_2m: 80, weather_code: 61, is_day: 1, wind_speed_10m: 10, precipitation: 0.4, surface_pressure: 998, visibility: 15000, cloud_cover: 88, dew_point_2m: 23 }, hourly: { time: hourly.map((row) => new Date(new Date(row.forecastTime).getTime() + 8 * hour).toISOString().slice(0, 16)), temperature_2m: hourly.map((row) => row.temperature.value), apparent_temperature: hourly.map((row) => row.feelsLike.value), relative_humidity_2m: hourly.map((row) => row.humidity * 100), precipitation_probability: hourly.map((row) => row.precipitation.probability * 100), precipitation: hourly.map((row) => row.precipitation.amount.value), weather_code: hourly.map(() => 61), is_day: hourly.map(() => 1), wind_speed_10m: hourly.map(() => 10) }, daily: { time: ['2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05', '2026-09-06'], weather_code: [61, 3, 2, 2, 1], temperature_2m_max: [30, 29, 30, 31, 31], temperature_2m_min: [24, 23, 23, 24, 24], precipitation_probability_max: [78, 40, 20, 20, 10] } }
   };
-  window.chrome = { webview: { postMessage: function() {} } };
+  const nativeMessageListeners = [];
+  window.chrome = { webview: {
+    addEventListener: function(type, listener) {
+      if (type === 'message') nativeMessageListeners.push(listener);
+    },
+    postMessage: function(message) {
+      if (scenario !== 'auto' || !message.startsWith('ep_weather_auto_location|')) return;
+      const requestId = message.slice('ep_weather_auto_location|'.length);
+      setTimeout(function() {
+        const payload = JSON.stringify({ ok: true, latitude: 26.89, longitude: 112.57, city: '\u8861\u9633\u5e02', region: '\u6e56\u5357\u7701', country: '\u4e2d\u56fd' });
+        for (const listener of nativeMessageListeners) listener({ data: 'ep_weather_auto_location_result|' + requestId + '|' + payload });
+      }, 10);
+    }
+  } };
   window.__epWeatherTestMode = true;
   window.__previewRequests = Object.create(null);
   window.__epWeatherFetch = async function(url) {
@@ -77,7 +90,7 @@ const mockBootstrap = String.raw`<script>
     return { ok: true, status: 200, headers: { get: function() { return null; } }, json: async function() { return body; } };
   };
   window.addEventListener('DOMContentLoaded', function() {
-    window.epWeatherGetData('\u84b8\u6e58\u533a', 'zh-CN', 0, 40, 40, 'preview.qweatherapi.com');
+    window.epWeatherGetData(scenario === 'auto' ? '' : '\u84b8\u6e58\u533a', 'zh-CN', 0, 40, 40, 'preview.qweatherapi.com');
     if (scenario === 'stale') {
       setTimeout(function() {
         window.epWeatherGetData('\u5cb3\u9e93\u533a', 'zh-CN', 0, 40, 40, 'preview.qweatherapi.com');

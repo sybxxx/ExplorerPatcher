@@ -3,6 +3,7 @@
 #include "ep_weather.h"
 #include "ep_weather_utility.h"
 #include "ep_weather_host_h.h"
+#include "ep_weather_location.h"
 #include "../ExplorerPatcher/def.h"
 #include "../ExplorerPatcher/weather_qweather_config.h"
 #include <windowsx.h>
@@ -61,6 +62,9 @@ typedef interface EPWeather
     INT64 bBrowserRestartPending; // interlocked
     INT64 bDataCapturePending; // interlocked
     LONG64 dwBrowserGeneration; // interlocked
+    INT64 bAutoLocationInFlight; // interlocked
+    LONG64 dwAutoLocationBrowserGeneration;
+    WCHAR wszAutoLocationRequestId[EP_WEATHER_AUTO_LOCATION_REQUEST_ID_MAX];
     DWORD dwBrowserRestartFailures;
     HWND hNotifyWnd; // interlocked
     LONG64 dwTemperatureUnit; // interlocked

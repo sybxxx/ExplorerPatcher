@@ -14,13 +14,31 @@ WebView2 exposes a document loaded with `NavigateToString` as a `data:text/html`
 
 The API Key is protected with Windows DPAPI for the current user and stored as `REG_BINARY` in `HKCU\Software\ExplorerPatcher\WeatherQWeatherApiKeyProtected`. ExplorerPatcher's settings export deliberately excludes both the API Host and protected key. Removing the configuration deletes both values.
 
+## Location selection and proxy safety
+
+The **Location** field has two modes:
+
+- A non-empty value is treated as an explicit city, district, or postal-code
+  query and remains the manual override.
+- An empty value enables automatic location. The native weather host makes one
+  bounded request to `https://ipwho.is/` with WinInet's `INTERNET_OPEN_TYPE_DIRECT`
+  mode, which bypasses the configured system proxy. The widget therefore does
+  not use the `127.0.0.1:10808` proxy exit address as the weather location.
+
+The direct lookup returns an approximate public-IP location, not GPS precision.
+When QWeather is configured, the resulting coordinates are passed through
+QWeather's city lookup to obtain the displayed place name. If the direct lookup
+cannot complete, the widget does not silently fall back to the proxy-based IP;
+enter a manual location instead. A VPN or transparent/TUN network that changes
+the direct route cannot be distinguished from the real network by this check.
+
 ## Data and refresh policy
 
 The provider uses these endpoints:
 
 | Dataset | Endpoint | Refresh interval |
 | --- | --- | ---: |
-| Location | `/geo/v2/city/lookup` | Once per page lifecycle |
+| Location | Direct IP lookup, then `/geo/v2/city/lookup` when configured | Once per page lifecycle |
 | Current conditions | `/weather/v1/current/{lat}/{lon}` | 10 minutes |
 | 24 hourly forecasts | `/weather/v1/hourly/{lat}/{lon}` | 60 minutes |
 | 5 daily forecasts | `/weather/v1/daily/{lat}/{lon}` | 3 hours |
@@ -46,7 +64,7 @@ host reapplies these colors when Windows broadcasts a color-scheme change.
 
 ## Fallback and attribution
 
-Without valid QWeather credentials, or when the first QWeather current-conditions request cannot complete, the widget keeps its lightweight Open-Meteo fallback. Esri and Photon remain fallback geocoders. The popup labels fallback mode instead of presenting Open-Meteo data as QWeather data.
+Without valid QWeather credentials, or when the first QWeather current-conditions request cannot complete, the widget keeps its lightweight Open-Meteo fallback. Esri and Photon remain manual-query fallback geocoders. Automatic location never falls back to a proxy-observed IP address. The popup labels fallback mode instead of presenting Open-Meteo data as QWeather data.
 
 QWeather mode displays the required QWeather attribution, uses the official `metadata.attributions` link when supplied, and preserves source names returned in each API response's `refer.sources` field. The local page creates source links without loading remote pages inside the weather WebView.
 
@@ -89,6 +107,8 @@ The maintainable provider sources are:
 - `ep_weather_host/ep_weather_provider_data.js`
 - `ep_weather_host/ep_weather_provider_icons.js`
 - `ep_weather_host/ep_weather_provider_ui.js`
+- `ep_weather_host/ep_weather_location.cpp`
+- `ep_weather_host/ep_weather_location.h`
 - `ep_weather_host/assets/qweather-icons-1.8.0.woff2`
 - `ep_weather_host/assets/qweather-icons-1.8.0.json`
 
@@ -100,6 +120,6 @@ node ep_weather_host\verify_open_meteo_provider.js
 pwsh -File ep_weather_host\verify_qweather_config.ps1
 ```
 
-The generated `ep_weather_provider_open_meteo_html.h` remains the C build input for compatibility with the existing weather provider. The verifiers check source/header synchronization, bounded C string literals, embedded official icon assets, JavaScript syntax, required endpoints and lifecycle limits, current QWeather response normalization, native header injection, strict API Host matching, vertical scrolling behavior, and DPAPI storage.
+The generated `ep_weather_provider_open_meteo_html.h` remains the C build input for compatibility with the existing weather provider. The verifiers check source/header synchronization, bounded C string literals, embedded official icon assets, JavaScript syntax, required endpoints and lifecycle limits, current QWeather response normalization, native header injection, strict API Host matching, direct-IP location routing, vertical scrolling behavior, and DPAPI storage.
 
 Real API acceptance still requires an account-specific API Host and API Key. Never add either value to test fixtures, logs, screenshots, commits, or build packages.

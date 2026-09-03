@@ -72,6 +72,9 @@ function labels() {
   return isChinese() ? {
     loading: '\u52a0\u8f7d\u4e2d...',
     error: '\u65e0\u6cd5\u83b7\u53d6\u5929\u6c14',
+    autoLocation: '\u6b63\u5728\u901a\u8fc7\u76f4\u8fde IP \u5b9a\u4f4d...',
+    autoLocationError: '\u76f4\u8fde IP \u5b9a\u4f4d\u5931\u8d25\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
+    directIp: '\u76f4\u8fde IP',
     feels: '\u4f53\u611f\u6e29\u5ea6',
     humidity: '\u76f8\u5bf9\u6e7f\u5ea6',
     wind: '\u98ce\u5411\u98ce\u901f',
@@ -131,6 +134,9 @@ function labels() {
   } : {
     loading: 'Loading...',
     error: 'Unable to load weather',
+    autoLocation: 'Locating through a direct IP connection...',
+    autoLocationError: 'Direct IP location failed; enter a location manually',
+    directIp: 'Direct IP',
     feels: 'Feels like',
     humidity: 'Humidity',
     wind: 'Wind',
@@ -327,7 +333,7 @@ function setLoading() {
   const value = labels();
   setStaticLabels();
   document.documentElement.lang = state.language || 'en';
-  elements.location.textContent = state.location || 'Weather';
+  elements.location.textContent = state.location || value.autoLocation;
   elements.resolved.textContent = '';
   elements.providerState.textContent = '';
   elements.providerState.classList.remove('warning');
@@ -376,7 +382,8 @@ function setLoading() {
 
 function setError() {
   setLoading();
-  elements.condition.textContent = labels().error;
+  const value = labels();
+  elements.condition.textContent = state.location ? value.error : value.autoLocationError;
   elements.providerState.textContent = state.apiHost ? labels().fallback : 'Open-Meteo';
   elements.providerState.classList.add('warning');
 }
@@ -924,6 +931,8 @@ function collectSources() {
   } else {
     append(['Open-Meteo', state.place && state.place.source]);
   }
+  if (state.mode === 'qweather') append([state.place && state.place.source]);
+  if (state.place && /^Direct IP/i.test(textValue(state.place.source))) append(['ipwho.is']);
   return sources;
 }
 
@@ -1046,6 +1055,9 @@ function renderWeather() {
   const resolvedParts = [state.place && state.place.city, state.place && (state.place.province || state.place.country)]
     .map((part) => textValue(part))
     .filter((part, index, array) => part && array.indexOf(part) === index && part !== elements.location.textContent);
+  if (state.place && /^Direct IP/i.test(textValue(state.place.source))) {
+    resolvedParts.push(value.directIp);
+  }
   elements.resolved.textContent = resolvedParts.join(' \u00b7 ');
   renderProviderState();
   elements.temperature.textContent = Math.round(displayTemperatureValue(item.temp));
