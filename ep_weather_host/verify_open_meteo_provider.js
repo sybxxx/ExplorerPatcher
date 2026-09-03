@@ -156,7 +156,8 @@ for (const text of [
   'SetHeader(headers, L"X-QW-Api-Key", apiKey)',
   'EPQWeather_IsRequestUriForHost',
   'EP_WEATHER_WM_CAPTURE_DATA',
-  'add_WebMessageReceived'
+  'add_WebMessageReceived',
+  '--disable-site-isolation-trials --disable-web-security --allow-insecure-localhost'
 ]) {
   if (!hostSource.includes(text)) throw new Error(`Missing native host protection: ${text}`);
 }

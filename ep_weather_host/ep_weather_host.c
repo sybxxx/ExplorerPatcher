@@ -701,10 +701,11 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2ExecuteScriptCompletedHandler_QueryInterf
 
 HRESULT STDMETHODCALLTYPE ICoreWebView2_get_AdditionalBrowserArguments(ICoreWebView2EnvironmentOptions* _this, LPWSTR* value)
 {
-    *value = CoTaskMemAlloc(sizeof(WCHAR));
+    static const WCHAR arguments[] = L"--disable-site-isolation-trials --disable-web-security --allow-insecure-localhost";
+    *value = CoTaskMemAlloc(sizeof(arguments));
     if (*value)
     {
-        (*value)[0] = 0;
+        wcscpy_s(*value, ARRAYSIZE(arguments), arguments);
     }
     return S_OK;
 }

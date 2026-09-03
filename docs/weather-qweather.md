@@ -8,6 +8,8 @@ Open **ExplorerPatcher Properties > Weather** and choose **Configure QWeather AP
 
 Only HTTPS hosts ending in `.qweatherapi.com` are accepted. The native weather host injects `X-QW-Api-Key` only into `GET` requests whose host exactly matches the validated configured host. The key is never passed to JavaScript or placed in a URL.
 
+The provider document is loaded with `NavigateToString`, which has an opaque local origin in WebView2. The weather host therefore enables the WebView2 cross-origin compatibility flags required for its HTTPS JSON requests. The host still blocks in-panel navigation to unapproved external pages, and API authentication remains native and host-scoped.
+
 The API Key is protected with Windows DPAPI for the current user and stored as `REG_BINARY` in `HKCU\Software\ExplorerPatcher\WeatherQWeatherApiKeyProtected`. ExplorerPatcher's settings export deliberately excludes both the API Host and protected key. Removing the configuration deletes both values.
 
 ## Data and refresh policy
