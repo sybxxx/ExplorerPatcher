@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>ExplorerPatcher 和风天气 UI 样板 (优化版 v2)</title>
+<style>
+@font-face {
+  font-family: "QWeather Icons";
+  src: url("./assets/qweather-icons.woff2") format("woff2");
+  font-display: block;
+}
+
+:root {
+  color-scheme: light;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.01em;
+  
+  --page-bg: #eaeff5;
+  --panel-bg: rgba(255, 255, 255, 0.96);
+  --panel-border: rgba(0, 0, 0, 0.08);
+  --card-bg: #f5f8fb;
+  --card-bg-hover: #edf2f7;
+  --card-border: rgba(0, 0, 0, 0.05);
+  --inner-border: rgba(0, 0, 0, 0.06);
+  
+  --text-main: #191c20;
+  --text-sub: #555f6d;
+  --text-muted: #8491a2;
+  
+  --brand: #0284c7;
+  --brand-soft: #e0f2fe;
+  --weather-icon: #0284c7;
+  
+  --blue: #0284c7;
+  --blue-soft: #e0f2fe;
+  --green: #16a34a;
+  --green-soft: #dcfce7;
+  --orange: #ea580c;
+  --orange-soft: #ffedd5;
+  --alert-blue: #0284c7;
+  --alert-blue-bg: #e0f2fe;
+  
+  --temp-cold: #38bdf8;
+  --temp-warm: #f97316;
+  
+  --shadow-panel: 0 20px 48px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 2px 8px rgba(15, 23, 42, 0.04);
+  --radius-panel: 16px;
+  --radius-card: 12px;
+  --radius-pill: 9999px;
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page-bg: #0c0f14;
+  --panel-bg: rgba(23, 27, 34, 0.96);
+  --panel-border: rgba(255, 255, 255, 0.09);
+  --card-bg: #1e232c;
+  --card-bg-hover: #262c37;
+  --card-border: rgba(255, 255, 255, 0.06);
+  --inner-border: rgba(255, 255, 255, 0.08);
+  
+  --text-main: #f1f5f9;
+  --text-sub: #94a3b8;
+  --text-muted: #64748b;
+  
+  --brand: #38bdf8;
+  --brand-soft: rgba(56, 189, 248, 0.15);
+  --weather-icon: #38bdf8;
+  
+  --blue: #38bdf8;
+  --blue-soft: rgba(56, 189, 248, 0.15);
+  --green: #4ade80;
+  --green-soft: rgba(74, 222, 128, 0.15);
+  --orange: #fb923c;
+  --orange-soft: rgba(251, 146, 60, 0.15);
+  --alert-blue: #38bdf8;
+  --alert-blue-bg: rgba(56, 189, 248, 0.14);
+  
+  --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page-bg: #0c0f14;
+    --panel-bg: rgba(23, 27, 34, 0.96);
+    --panel-border: rgba(255, 255, 255, 0.09);
+    --card-bg: #1e232c;
+    --card-bg-hover: #262c37;
+    --card-border: rgba(255, 255, 255, 0.06);
+    --inner-border: rgba(255, 255, 255, 0.08);
+    
+    --text-main: #f1f5f9;
+    --text-sub: #94a3b8;
+    --text-muted: #64748b;
+    
+    --brand: #38bdf8;
+    --brand-soft: rgba(56, 189, 248, 0.15);
+    --weather-icon: #38bdf8;
+    
+    --blue: #38bdf8;
+    --blue-soft: rgba(56, 189, 248, 0.15);
+    --green: #4ade80;
+    --green-soft: rgba(74, 222, 128, 0.15);
+    --orange: #fb923c;
+    --orange-soft: rgba(251, 146, 60, 0.15);
+    --alert-blue: #38bdf8;
+    --alert-blue-bg: rgba(56, 189, 248, 0.14);
+    
+    --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-width: 320px; min-height: 100%; }
+body {
+  padding: 24px 16px;
+  background: var(--page-bg);
+  color: var(--text-main);
+  line-height: 1.5;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+button { font: inherit; border: none; background: none; cursor: pointer; color: inherit; }
+a { color: inherit; text-decoration: none; }
+
+/* 主天气外壳 - Win11 优雅卡片微质感 */
+.weather-panel {
+  width: min(920px, 100%);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+/* 顶部导航栏 */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--inner-border);
+  gap: 16px;
+}
+.location-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.pulse-badge {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+}
+.pulse-badge::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.35);
+  animation: pulse 2.5s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  70% { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.location-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.location-sub {
+  color: var(--text-sub);
+  font-size: 12px;
+  white-space: nowrap;
+  padding-left: 6px;
+  border-left: 1px solid var(--inner-border);
+}
+
+.top-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--brand-soft);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(2, 132, 199, 0.15);
+  transition: var(--transition);
+}
+.version-badge:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+}
+.update-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.update-status strong {
+  color: var(--text-sub);
+  font-weight: 600;
+}
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-sub);
+  font-size: 14px;
+  transition: var(--transition);
+}
+.action-btn:hover {
+  background: var(--card-bg-hover);
+  color: var(--text-main);
+  transform: translateY(-1px);
+}
+.action-btn.spinning svg {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* 灾害天气预警条 - 柔和层次卡片 */
+.alert-banner {
+  margin: 14px 24px 4px;
+  border-radius: 10px;
+  background: var(--alert-blue-bg);
+  border: 1px solid rgba(2, 132, 199, 0.2);
+  overflow: hidden;
+  transition: var(--transition);
+}
+.alert-banner summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+  gap: 10px;
+}
+.alert-banner summary::-webkit-details-marker { display: none; }
+.alert-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.alert-pill {
+  padding: 2px 7px;
+  background: var(--alert-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.alert-text {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alert-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.chevron-icon {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  transition: transform 0.25s ease;
+}
+.alert-banner[open] .chevron-icon {
+  transform: rotate(180deg);
+}
+.alert-content {
+  padding: 0 14px 12px 39px;
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.6;
+}
+
+/* 天气图标规范 */
+.weather-glyph {
+  display: inline-grid;
+  place-items: center;
+  font-family: "QWeather Icons" !important;
+  font-style: normal;
+  font-weight: 400;
+  font-variant: normal;
+  line-height: 1;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+}
+.qi-100::before { content: "\f101"; }
+.qi-101::before { content: "\f102"; }
+.qi-104::before { content: "\f105"; }
+.qi-150::before { content: "\f106"; }
+.qi-151::before { content: "\f107"; }
+.qi-152::before { content: "\f108"; }
+.qi-153::before { content: "\f109"; }
+.qi-305::before { content: "\f10f"; }
+.qi-306::before { content: "\f110"; }
+.qi-307::before { content: "\f111"; }
+.qi-308::before { content: "\f112"; }
+.qi-501::before { content: "\f12f"; }
+.qi-502::before { content: "\f130"; }
+.qi-999::before { content: "\f146"; }
+
+/* 当前主天气区 - Hero Section */
+.hero-section {
+  padding: 20px 24px 18px;
+}
+.hero-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.hero-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.hero-icon {
+  font-size: 82px;
+  color: var(--weather-icon);
+  filter: drop-shadow(0 4px 12px rgba(2, 132, 199, 0.2));
+  flex-shrink: 0;
+}
+.temp-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.temp-val-group {
+  display: flex;
+  align-items: baseline;
+}
+.temp-num {
+  font-size: 68px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+.temp-unit {
+  font-size: 26px;
+  font-weight: 500;
+  margin-left: 2px;
+  color: var(--text-sub);
+}
+.hero-condition {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.condition-badge {
+  font-size: 19px;
+  font-weight: 700;
+}
+.temp-range-pill {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sub);
+  background: var(--card-bg);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--card-border);
+}
+
+.hero-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 6px;
+}
+.weather-status-summary {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--brand-soft);
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+.weather-feel {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* 关键天气指标 - 5小卡片网格 */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+.metric-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: var(--transition);
+}
+.metric-card:hover {
+  background: var(--card-bg-hover);
+  transform: translateY(-1px);
+}
+.metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.metric-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+.metric-sub {
+  font-size: 10px;
+  color: var(--text-sub);
+}
+.mini-bar-track {
+  width: 100%;
+  height: 4px;
+  background: var(--inner-border);
+  border-radius: 2px;
+  margin-top: 2px;
+  overflow: hidden;
+}
+.mini-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--brand);
+}
+
+/* 通用区块外壳 */
+.section {
+  padding: 18px 24px;
+  border-top: 1px solid var(--inner-border);
+}
+.section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.section-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.section-lead {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+
+/* 未来 2 小时降水卡片 */
+.rain-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  padding: 14px 16px 12px;
+}
+.rain-tip-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--orange);
+}
+.rain-tip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+}
+.rain-chart-wrapper {
+  position: relative;
+  height: 74px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.rain-bars-container {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  align-items: end;
+  gap: 4px;
+  height: 54px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--inner-border);
+}
+.rain-bar-col {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  cursor: pointer;
+}
+.rain-bar-fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--brand);
+  transition: height 0.3s ease, background-color 0.2s;
+}
+.rain-bar-col:hover .rain-bar-fill {
+  background: #0ea5e9;
+  filter: brightness(1.2);
+}
+.rain-threshold-lines {
+  position: absolute;
+  inset: 0 0 18px 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.threshold-line {
+  border-top: 1px dashed rgba(148, 163, 184, 0.25);
+  display: flex;
+  justify-content: flex-end;
+  font-size: 9px;
+  color: var(--text-muted);
+  padding-right: 2px;
+}
+.rain-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+/* 浮动提示框 */
+.chart-tooltip {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-main);
+  color: var(--panel-bg);
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+.rain-bar-col:hover .chart-tooltip {
+  opacity: 1;
+}
+
+/* 未来 24 小时气温趋势与横向时间轴 (平滑折线 + 滚动卡片) */
+.hourly-scroll-wrapper {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.hourly-scroll-inner {
+  display: flex;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 14px 10px 12px;
+  gap: 6px;
+}
+.hourly-scroll-inner::-webkit-scrollbar {
+  height: 5px;
+}
+.hourly-scroll-inner::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+}
+.hourly-item {
+  flex: 0 0 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 8px;
+  transition: var(--transition);
+}
+.hourly-item:hover {
+  background: var(--card-bg-hover);
+}
+.hourly-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.hourly-icon {
+  font-size: 26px;
+  color: var(--weather-icon);
+  margin: 6px 0 4px;
+}
+.hourly-temp {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.hourly-desc {
+  font-size: 10.5px;
+  color: var(--text-sub);
+  margin-top: 2px;
+}
+.hourly-pop {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--brand);
+  background: var(--brand-soft);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+
+/* 空气质量卡片 */
+.air-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+.air-main-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: 20px;
+}
+.aqi-gauge-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-right: 16px;
+  border-right: 1px solid var(--inner-border);
+}
+.aqi-score {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--green);
+}
+.aqi-level-pill {
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+}
+.aqi-scale-bar {
+  width: 90px;
+  height: 4px;
+  background: linear-gradient(90deg, #22c55e 0%, #eab308 35%, #f97316 65%, #ef4444 100%);
+  border-radius: 2px;
+  margin-top: 8px;
+  position: relative;
+}
+.aqi-scale-dot {
+  position: absolute;
+  top: -3px;
+  left: 10%; /* 30/300 roughly 10% */
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(0,0,0,0.4);
+}
+
+.pollutants-list {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.pollutant-box {
+  background: var(--panel-bg);
+  border: 1px solid var(--inner-border);
+  border-radius: 8px;
+  padding: 7px 5px;
+  text-align: center;
+}
+.pollutant-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.pollutant-num {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 2px;
+}
+.pollutant-ratio-bar {
+  height: 3px;
+  background: var(--inner-border);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.pollutant-ratio-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 2px;
+}
+.air-tip-banner {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 11.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 未来 5 天预报与温度区间条 (Range Bar) */
+.daily-list-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.daily-row {
+  display: grid;
+  grid-template-columns: 80px 100px 70px 1fr;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--inner-border);
+  transition: var(--transition);
+}
+.daily-row:last-child {
+  border-bottom: none;
+}
+.daily-row:hover {
+  background: var(--card-bg-hover);
+}
+.daily-date-col {
+  display: flex;
+  flex-direction: column;
+}
+.daily-day {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.daily-subdate {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.daily-weather-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.daily-icon {
+  font-size: 24px;
+  color: var(--weather-icon);
+}
+.daily-desc {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.daily-pop-col {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand);
+}
+.daily-temp-bar-col {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.temp-label-low {
+  font-size: 12px;
+  color: var(--text-muted);
+  width: 24px;
+  text-align: right;
+}
+.temp-label-high {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  width: 24px;
+}
+.temp-range-track {
+  flex: 1;
+  max-width: 140px;
+  height: 6px;
+  background: var(--inner-border);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+.temp-range-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #38bdf8 0%, #f97316 100%);
+}
+
+/* 底部状态栏 */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  border-top: 1px solid var(--inner-border);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.footer a {
+  color: var(--brand);
+  font-weight: 600;
+}
+.footer a:hover {
+  text-decoration: underline;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  body { padding: 8px; }
+  .weather-panel { border-radius: 12px; }
+  .hero-main { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .hero-right { align-items: flex-start; text-align: left; }
+  .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+  .air-main-row { grid-template-columns: 1fr; }
+  .aqi-gauge-box { border-right: none; border-bottom: 1px solid var(--inner-border); padding-bottom: 12px; padding-right: 0; }
+  .pollutants-list { grid-template-columns: repeat(3, 1fr); }
+  .daily-row { grid-template-columns: 70px 85px 55px 1fr; }
+}
+
+@media (max-width: 480px) {
+  body { padding: 0; }
+  .weather-panel { border-radius: 0; border: none; }
+  .topbar { padding: 12px 16px; }
+  .section { padding: 14px 16px; }
+  .hero-section { padding: 14px 16px; }
+  .hero-icon { font-size: 64px; }
+  .temp-num { font-size: 54px; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .daily-row { grid-template-columns: 60px 1fr 70px; gap: 6px; }
+  .daily-pop-col { display: none; }
+  .pollutants-list { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<main class="weather-panel" aria-label="蒸湘区天气面板">
+  <!-- 顶栏导航 -->
+  <header class="topbar">
+    <div class="location-group">
+      <span class="pulse-badge" aria-hidden="true"></span>
+      <h1 class="location-title">蒸湘区</h1>
+      <span class="location-sub">衡阳市 · 湖南省</span>
+    </div>
+    
+    <div class="top-controls">
+      <a href="./weather-qweather-ui.html" class="version-badge" title="点击切换查看原始版本对比">
+        <span>原版对比</span>
+        <span>↗</span>
+      </a>
+      <div class="update-status">
+        <span><strong>和风天气</strong> 13:51</span>
+      </div>
+      <button class="action-btn" id="btn-theme" title="切换显示模式 (浅色/深色/跟随系统)" aria-label="切换主题">🌓</button>
+      <button class="action-btn" id="btn-refresh" title="刷新天气数据" aria-label="刷新数据">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- 暴雨预警卡片 -->
+  <details class="alert-banner" open>
+    <summary>
+      <div class="alert-left">
+        <span class="alert-pill">暴雨蓝色</span>
+        <span class="alert-text">湖南省气象局发布暴雨蓝色预警</span>
+      </div>
+      <div class="alert-right">
+        <time>9/2 16:08</time>
+        <svg class="chevron-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+    </summary>
+    <div class="alert-content">
+      预计未来 12 小时湘中、湘南部分地区将出现较强降雨，请注意防范短时强降水、雷暴大风及可能引发的城市内涝、山洪滑坡等次生灾害。
+    </div>
+  </details>
+
+  <!-- 当前天气核心面板 (Hero) -->
+  <section class="hero-section" aria-label="实时天气">
+    <div class="hero-main">
+      <div class="hero-left">
+        <i class="weather-glyph hero-icon qi-306" role="img" aria-label="中雨"></i>
+        <div class="temp-wrap">
+          <div class="temp-val-group">
+            <span class="temp-num">20</span>
+            <span class="temp-unit">°C</span>
+          </div>
+          <div class="hero-condition">
+            <span class="condition-badge">中雨</span>
+            <span class="temp-range-pill">今日 17° ~ 21°</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="hero-right">
+        <div class="weather-status-summary">降雨预计将持续约 2 小时</div>
+        <div class="weather-feel">体感 17°C · 相对湿度较高 · 西北微风</div>
+      </div>
+    </div>
+
+    <!-- 关键指标微卡片 -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-header"><span>体感温度</span><span>🌡️</span></div>
+        <div class="metric-val">17°C</div>
+        <div class="metric-sub">体感偏凉</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-header"><span>相对湿度</span><span>💧</span></div>
+        <div class="metric-val">92%</div>
+        <div class="mini-bar-track"><div class="mini-bar-fill" style="width: 92%;"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-header"><span>风向风速</span><span>🧭</span></div>
+        <div class="metric-val">西北风 29</div>
+        <div class="metric-sub">4 级 · 阵风较大</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-header"><span>当前降水</span><span>🌧️</span></div>
+        <div class="metric-val">1.6 mm</div>
+        <div class="metric-sub">过去 1 小时累计</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-header"><span>能见度</span><span>👁️</span></div>
+        <div class="metric-val">23 km</div>
+        <div class="metric-sub">视野极佳</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 未来 2 小时降水 -->
+  <section class="section" aria-labelledby="sec-rain-title">
+    <div class="section-header">
+      <div class="title-group">
+        <h2 class="section-title" id="sec-rain-title">未来 2 小时降水</h2>
+        <span class="section-tag">雷达逐 5 分钟预测 · 13:45</span>
+      </div>
+      <span class="section-lead">和风天气高精度预报</span>
+    </div>
+
+    <div class="rain-card">
+      <div class="rain-tip-line">
+        <span class="rain-tip-dot"></span>
+        <span>10 分钟后开始下小雨，之后雨势逐渐增强至中雨</span>
+      </div>
+      
+      <div class="rain-chart-wrapper">
+        <div class="rain-threshold-lines">
+          <div class="threshold-line"><span>中雨 (0.15)</span></div>
+          <div class="threshold-line"><span>小雨 (0.05)</span></div>
+        </div>
+        <div class="rain-bars-container" id="rain-bars"></div>
+      </div>
+      
+      <div class="rain-axis">
+        <span>现在</span>
+        <span>30 分钟</span>
+        <span>60 分钟</span>
+        <span>90 分钟</span>
+        <span>120 分钟</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 未来 24 小时预报 (平滑时间轴) -->
+  <section class="section" aria-labelledby="sec-hourly-title">
+    <div class="section-header">
+      <div class="title-group">
+        <h2 class="section-title" id="sec-hourly-title">未来 24 小时预报</h2>
+        <span class="section-tag">逐小时天气 · 气温 · 降水概率</span>
+      </div>
+      <span class="section-lead">可左右滑动查看</span>
+    </div>
+
+    <div class="hourly-scroll-wrapper">
+      <div class="hourly-scroll-inner" id="hourly-scroll"></div>
+    </div>
+  </section>
+
+  <!-- 空气质量 -->
+  <section class="section" aria-labelledby="sec-air-title">
+    <div class="section-header">
+      <div class="title-group">
+        <h2 class="section-title" id="sec-air-title">空气质量 (AQI)</h2>
+        <span class="section-tag">中国环境监测总站标准</span>
+      </div>
+      <span class="section-lead">实时监测</span>
+    </div>
+
+    <div class="air-card">
+      <div class="air-main-row">
+        <div class="aqi-gauge-box">
+          <div class="aqi-score">30</div>
+          <div class="aqi-level-pill">优 · 一级</div>
+          <div class="aqi-scale-bar" title="AQI 刻度 0 - 300+">
+            <div class="aqi-scale-dot"></div>
+          </div>
+        </div>
+        
+        <div class="pollutants-list">
+          <div class="pollutant-box">
+            <div class="pollutant-label">PM2.5</div>
+            <div class="pollutant-num">9</div>
+            <div class="pollutant-ratio-bar"><div class="pollutant-ratio-fill" style="width: 25%;"></div></div>
+          </div>
+          <div class="pollutant-box">
+            <div class="pollutant-label">PM10</div>
+            <div class="pollutant-num">13</div>
+            <div class="pollutant-ratio-bar"><div class="pollutant-ratio-fill" style="width: 26%;"></div></div>
+          </div>
+          <div class="pollutant-box">
+            <div class="pollutant-label">NO₂</div>
+            <div class="pollutant-num">7</div>
+            <div class="pollutant-ratio-bar"><div class="pollutant-ratio-fill" style="width: 17%;"></div></div>
+          </div>
+          <div class="pollutant-box">
+            <div class="pollutant-label">O₃</div>
+            <div class="pollutant-num">95</div>
+            <div class="pollutant-ratio-bar"><div class="pollutant-ratio-fill" style="width: 59%;"></div></div>
+          </div>
+          <div class="pollutant-box">
+            <div class="pollutant-label">SO₂</div>
+            <div class="pollutant-num">5</div>
+            <div class="pollutant-ratio-bar"><div class="pollutant-ratio-fill" style="width: 10%;"></div></div>
+          </div>
+          <div class="pollutant-box">
+            <div class="pollutant-label">CO</div>
+            <div class="pollutant-num">0.7</div>
+            <div class="pollutant-ratio-bar"><div class="pollutant-ratio-fill" style="width: 18%;"></div></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="air-tip-banner">
+        <span>🍃</span>
+        <span>空气质量优良，清新洁净，适宜开窗通风与各类户外运动。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 未来 5 天预报 (带相对温度区间条) -->
+  <section class="section" aria-labelledby="sec-daily-title">
+    <div class="section-header">
+      <div class="title-group">
+        <h2 class="section-title" id="sec-daily-title">未来 5 天预报</h2>
+        <span class="section-tag">多日趋势 · 气温区间柱</span>
+      </div>
+      <span class="section-lead">衡阳地区</span>
+    </div>
+
+    <div class="daily-list-card" id="daily-list"></div>
+  </section>
+
+  <!-- 页脚说明 -->
+  <footer class="footer">
+    <span>天气数据与图标由 <a href="https://www.qweather.com/" target="_blank" rel="noreferrer">和风天气 (QWeather)</a> 授权提供</span>
+    <span>ExplorerPatcher Weather Widget Prototype v2</span>
+  </footer>
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  // 1. 主题切换与图标状态管理
+  const root = document.documentElement;
+  const btnTheme = document.getElementById('btn-theme');
+  const btnRefresh = document.getElementById('btn-refresh');
+
+  function updateThemeButtonIcon() {
+    const current = root.dataset.theme;
+    if (current === 'dark') {
+      btnTheme.textContent = '🌙';
+    } else if (current === 'light') {
+      btnTheme.textContent = '☀️';
+    } else {
+      btnTheme.textContent = '🌓';
+    }
+  }
+
+  const queryTheme = new URLSearchParams(window.location.search).get('theme');
+  if (queryTheme === 'light' || queryTheme === 'dark') {
+    root.dataset.theme = queryTheme;
+  }
+  updateThemeButtonIcon();
+
+  btnTheme.addEventListener('click', function() {
+    const current = root.dataset.theme;
+    if (!current) {
+      root.dataset.theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark';
+    } else if (current === 'light') {
+      root.dataset.theme = 'dark';
+    } else {
+      delete root.dataset.theme;
+    }
+    updateThemeButtonIcon();
+  });
+
+  // 模拟刷新按钮动画
+  btnRefresh.addEventListener('click', function() {
+    btnRefresh.classList.add('spinning');
+    setTimeout(function() {
+      btnRefresh.classList.remove('spinning');
+    }, 700);
+  });
+
+  // 2. 分钟级降水柱状图渲染 (带圆角与交互悬浮提示)
+  const rainData = [0, 0, .10, .10, .11, .11, .12, .13, .13, .11, .13, .15, .15, .15, .15, .11, .09, .11, .09, .09, .14, .16, .17, .19];
+  const rainBars = document.getElementById('rain-bars');
+  const rainMax = Math.max(0.2, ...rainData);
+
+  rainData.forEach(function(val, idx) {
+    const col = document.createElement('div');
+    col.className = 'rain-bar-col';
+
+    const bar = document.createElement('div');
+    bar.className = 'rain-bar-fill';
+    const heightPx = Math.max(2, Math.round((val / rainMax) * 48));
+    bar.style.height = heightPx + 'px';
+
+    if (val >= 0.15) {
+      bar.style.backgroundColor = 'var(--brand)';
+    } else if (val > 0) {
+      bar.style.backgroundColor = '#38bdf8';
+    } else {
+      bar.style.backgroundColor = 'var(--inner-border)';
+    }
+
+    const tip = document.createElement('div');
+    tip.className = 'chart-tooltip';
+    tip.textContent = (idx * 5) + 'm: ' + val.toFixed(2) + 'mm';
+
+    col.appendChild(bar);
+    col.appendChild(tip);
+    rainBars.appendChild(col);
+  });
+
+  // 3. 逐小时预报渲染 (横向时间轴流 + 支持滚轮平滑横滚)
+  const hoursData = [
+    ['14:00', '306', '中雨', 19, 88], ['15:00', '306', '中雨', 19, 87],
+    ['16:00', '305', '小雨', 19, 83], ['17:00', '306', '中雨', 19, 84],
+    ['18:00', '305', '小雨', 20, 82], ['19:00', '501', '雾', 20, 84],
+    ['20:00', '104', '阴', 21, 0],   ['21:00', '151', '多云', 21, 0],
+    ['22:00', '151', '多云', 20, 0], ['23:00', '151', '多云', 20, 0],
+    ['00:00', '151', '多云', 20, 0], ['01:00', '151', '多云', 20, 76],
+    ['02:00', '151', '多云', 20, 74], ['03:00', '305', '小雨', 20, 65],
+    ['04:00', '305', '小雨', 20, 68], ['05:00', '501', '雾', 20, 75],
+    ['06:00', '104', '阴', 21, 78],   ['07:00', '104', '阴', 21, 0],
+    ['08:00', '104', '阴', 21, 81],   ['09:00', '101', '多云', 22, 82],
+    ['10:00', '305', '小雨', 22, 78], ['11:00', '305', '小雨', 23, 73],
+    ['12:00', '501', '雾', 23, 70],   ['13:00', '501', '雾', 23, 72]
+  ];
+  const hourlyScroll = document.getElementById('hourly-scroll');
+  hoursData.forEach(function(item) {
+    const el = document.createElement('div');
+    el.className = 'hourly-item';
+    el.innerHTML = 
+      '<div class="hourly-time">' + item[0] + '</div>' +
+      '<i class="weather-glyph hourly-icon qi-' + item[1] + '" role="img" aria-label="' + item[2] + '"></i>' +
+      '<div class="hourly-temp">' + item[3] + '°</div>' +
+      '<div class="hourly-desc">' + item[2] + '</div>' +
+      (item[4] > 0 ? '<div class="hourly-pop">' + item[4] + '%</div>' : '<div style="height: 19px;"></div>');
+    hourlyScroll.appendChild(el);
+  });
+
+  // 支持滚轮直接横向平滑滚动
+  hourlyScroll.addEventListener('wheel', function(e) {
+    if (e.deltaY !== 0) {
+      e.preventDefault();
+      hourlyScroll.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
+
+  // 4. 未来 5 天预报渲染 (带动态相对温度区间条)
+  const daysData = [
+    { name: '今天', date: '9月2日', icon: '306', text: '中雨', min: 17, max: 21, pop: 88 },
+    { name: '明天', date: '9月3日', icon: '305', text: '小雨', min: 18, max: 23, pop: 72 },
+    { name: '周五', date: '9月4日', icon: '101', text: '多云', min: 19, max: 26, pop: 30 },
+    { name: '周六', date: '9月5日', icon: '100', text: '晴', min: 21, max: 29, pop: 10 },
+    { name: '周日', date: '9月6日', icon: '104', text: '阴', min: 20, max: 27, pop: 45 }
+  ];
+
+  const overallMin = Math.min(...daysData.map(d => d.min));
+  const overallMax = Math.max(...daysData.map(d => d.max));
+  const tempSpan = overallMax - overallMin;
+
+  const dailyList = document.getElementById('daily-list');
+  daysData.forEach(function(day) {
+    const row = document.createElement('div');
+    row.className = 'daily-row';
+
+    const leftPercent = Math.round(((day.min - overallMin) / tempSpan) * 100);
+    const widthPercent = Math.max(16, Math.round(((day.max - day.min) / tempSpan) * 100));
+
+    row.innerHTML = 
+      '<div class="daily-date-col">' +
+        '<span class="daily-day">' + day.name + '</span>' +
+        '<span class="daily-subdate">' + day.date + '</span>' +
+      '</div>' +
+      '<div class="daily-weather-col">' +
+        '<i class="weather-glyph daily-icon qi-' + day.icon + '" role="img" aria-label="' + day.text + '"></i>' +
+        '<span class="daily-desc">' + day.text + '</span>' +
+      '</div>' +
+      '<div class="daily-pop-col">' +
+        '💧 ' + day.pop + '%' +
+      '</div>' +
+      '<div class="daily-temp-bar-col">' +
+        '<span class="temp-label-low">' + day.min + '°</span>' +
+        '<div class="temp-range-track">' +
+          '<div class="temp-range-fill" style="left: ' + leftPercent + '%; width: ' + widthPercent + '%;"></div>' +
+        '</div>' +
+        '<span class="temp-label-high">' + day.max + '°</span>' +
+      '</div>';
+    dailyList.appendChild(row);
+  });
+})();
+</script>
+</body>
+</html>
