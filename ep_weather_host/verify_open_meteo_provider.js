@@ -7,6 +7,8 @@ const vm = require('vm');
 const root = __dirname;
 const headerPath = path.join(root, 'ep_weather_provider_open_meteo_html.h');
 const dataPath = path.join(root, 'ep_weather_provider_data.js');
+const iconFontPath = path.join(root, 'assets', 'qweather-icons-1.8.0.woff2');
+const iconMapPath = path.join(root, 'assets', 'qweather-icons-1.8.0.json');
 const hostPath = path.join(root, 'ep_weather_host.c');
 const configPath = path.join(root, '..', 'ExplorerPatcher', 'weather_qweather_config.c');
 const settingsPaths = [
@@ -24,7 +26,9 @@ const region = source.slice(start, end);
 const bodies = [...region.matchAll(/L"((?:\\.|[^"\\])*)"/g)].map((match) => match[1]);
 if (!bodies.length) throw new Error('No C string literals were found.');
 
-const html = bodies.map((body) => JSON.parse(`"${body}"`)).join('');
+const decodedBodies = bodies.map((body) => JSON.parse(`"${body}"`));
+assert.ok(decodedBodies.every((body) => body.length <= 8000), 'Generated C string literal exceeds the MSVC-safe limit');
+const html = decodedBodies.join('');
 const scriptStart = html.indexOf('<script>') + '<script>'.length;
 const scriptEnd = html.indexOf('</script>', scriptStart);
 if (scriptStart < '<script>'.length || scriptEnd < 0) {
@@ -48,6 +52,14 @@ for (const text of [
   'precipitationProbability',
   'normalizeQAlerts',
   'normalizeQAir',
+  'QWEATHER_ICON_GLYPHS',
+  'data:font/woff2;base64,',
+  'function weatherIconCode',
+  'function initializeWeatherIconFont',
+  'weather-glyph current-glyph',
+  'overflow-y: auto',
+  'scrollbar-gutter: stable',
+  'QWeather Icons',
   'ep_weather_updated',
   'function contentHeight',
   'function imageHex',
@@ -56,9 +68,27 @@ for (const text of [
 ]) {
   if (!html.includes(text)) throw new Error(`Missing required provider behavior: ${text}`);
 }
-for (const forbidden of ['www.google.com/search', '<iframe', 'X-QW-Api-Key']) {
+for (const forbidden of ['www.google.com/search', '<iframe', 'X-QW-Api-Key', './assets/qweather-icons', "addEventListener('wheel'"]) {
   if (html.includes(forbidden)) throw new Error(`Forbidden provider content: ${forbidden}`);
 }
+assert.ok(!html.includes('drawFallbackWeatherIcon'), 'Weather icons must use the official QWeather font');
+
+const iconFont = fs.readFileSync(iconFontPath);
+assert.strictEqual(iconFont.subarray(0, 4).toString('ascii'), 'wOF2');
+const embeddedFont = html.match(/data:font\/woff2;base64,([A-Za-z0-9+/=]+)/);
+assert.ok(embeddedFont, 'Embedded QWeather icon font was not found');
+assert.deepStrictEqual(Buffer.from(embeddedFont[1], 'base64'), iconFont);
+const iconMap = JSON.parse(fs.readFileSync(iconMapPath, 'utf8'));
+for (const name of ['100', '100-fill', '306', '306-fill', '999']) {
+  assert.ok(Number.isInteger(iconMap[name]), `Missing official QWeather icon mapping: ${name}`);
+}
+const embeddedMapMatch = html.match(/const QWEATHER_ICON_GLYPHS = Object\.freeze\((\{[^;]+\})\);/);
+assert.ok(embeddedMapMatch, 'Embedded QWeather weather icon map was not found');
+const embeddedIconMap = JSON.parse(embeddedMapMatch[1]);
+for (const name of ['100', '100-fill', '306', '306-fill', '999']) {
+  assert.strictEqual(embeddedIconMap[name], iconMap[name], `Wrong embedded QWeather icon mapping: ${name}`);
+}
+assert.ok(!Object.prototype.hasOwnProperty.call(embeddedIconMap, '1001'), 'Non-weather QWeather icon glyphs should not be embedded');
 
 const dataSource = fs.readFileSync(dataPath, 'utf8');
 const sandbox = {
@@ -191,6 +221,7 @@ console.log(JSON.stringify({
   htmlLength: html.length,
   scriptLength: scriptEnd - scriptStart,
   stringLiteralCount: bodies.length,
+  iconGlyphs: Object.keys(embeddedIconMap).length,
   hourlyPoints: hourly.length,
   status: 'ok'
 }));

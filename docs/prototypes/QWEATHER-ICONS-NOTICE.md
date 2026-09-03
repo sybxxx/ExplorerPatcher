@@ -10,6 +10,7 @@ QWeather Icons 1.8.0, upstream commit
 - Icon artwork license: CC BY 4.0,
   https://creativecommons.org/licenses/by/4.0/
 
-The copied font asset is `assets/qweather-icons.woff2`. The prototype keeps
-QWeather attribution visible in its footer. This prototype is not yet loaded
-by the ExplorerPatcher weather host.
+The vendored font and code-point map are stored in
+`ep_weather_host/assets/qweather-icons-1.8.0.*`. The provider generator embeds
+the font in the local weather document, and the prototypes load the same
+vendored font. QWeather attribution remains visible in the weather footer.

@@ -4,6 +4,7 @@ const elements = {
   resolved: document.getElementById('resolved'),
   providerState: document.getElementById('provider-state'),
   alerts: document.getElementById('alerts'),
+  currentGlyph: document.getElementById('current-glyph'),
   currentIcon: document.getElementById('current-icon'),
   temperature: document.getElementById('temperature'),
   unit: document.getElementById('unit'),
@@ -25,6 +26,7 @@ const elements = {
   airNote: document.getElementById('air-note'),
   aqiValue: document.getElementById('aqi-value'),
   aqiCategory: document.getElementById('aqi-category'),
+  aqiScaleDot: document.getElementById('aqi-scale-dot'),
   pollutants: document.getElementById('pollutants'),
   airAdvice: document.getElementById('air-advice'),
   forecast: document.getElementById('forecast'),
@@ -45,8 +47,8 @@ function labels() {
     error: '\u65e0\u6cd5\u83b7\u53d6\u5929\u6c14',
     feels: '\u4f53\u611f',
     humidity: '\u6e7f\u5ea6',
-    wind: '\u98ce\u901f',
-    precip: '\u964d\u6c34',
+    wind: '\u98ce\u5411\u98ce\u901f',
+    precip: '\u5f53\u524d\u964d\u6c34',
     visibility: '\u80fd\u89c1\u5ea6',
     updated: '\u66f4\u65b0',
     next2h: '\u672a\u6765 2 \u5c0f\u65f6\u964d\u6c34',
@@ -71,7 +73,10 @@ function labels() {
     officialAlert: '\u5b98\u65b9\u9884\u8b66',
     noRain: '\u672a\u6765 2 \u5c0f\u65f6\u6682\u65e0\u660e\u663e\u964d\u6c34',
     minutePoints: '\u6bcf 5 \u5206\u949f',
-    qweather: '\u548c\u98ce\u5929\u6c14'
+    qweather: '\u548c\u98ce\u5929\u6c14',
+    primary: '\u9996\u8981\u6c61\u67d3\u7269',
+    level: '\u7b49\u7ea7',
+    rain: '\u964d\u96e8'
   } : {
     loading: 'Loading...',
     error: 'Unable to load weather',
@@ -103,7 +108,10 @@ function labels() {
     officialAlert: 'Official alert',
     noRain: 'No significant precipitation in the next 2 hours',
     minutePoints: 'Every 5 minutes',
-    qweather: 'QWeather'
+    qweather: 'QWeather',
+    primary: 'Primary',
+    level: 'Level',
+    rain: 'Rain'
   };
 }
 
@@ -147,115 +155,6 @@ function weatherText(item, provider) {
     : openMeteoCondition(item && item.code));
 }
 
-function weatherKind(code, provider) {
-  const value = Number(code);
-  if (provider === 'qweather') {
-    if ([100, 150].includes(value)) return 'clear';
-    if ([101, 102, 151, 152].includes(value)) return 'partly';
-    if ([103, 104, 153, 154].includes(value)) return 'cloud';
-    if ((value >= 302 && value <= 304) || (value >= 307 && value <= 313)) return 'storm';
-    if (value >= 300 && value < 400) return 'rain';
-    if (value >= 400 && value < 500) return 'snow';
-    if (value >= 500 && value < 600) return 'fog';
-    return 'cloud';
-  }
-  if (value === 0 || value === 1) return 'clear';
-  if (value === 2) return 'partly';
-  if (value === 45 || value === 48) return 'fog';
-  if ((value >= 71 && value <= 77) || value === 85 || value === 86) return 'snow';
-  if (value >= 95) return 'storm';
-  if ((value >= 51 && value <= 67) || (value >= 80 && value <= 82)) return 'rain';
-  return 'cloud';
-}
-
-function isDaytime(item, provider) {
-  if (item && item.isDay !== null && item.isDay !== undefined) return Number(item.isDay) === 1;
-  const code = Number(item && item.code);
-  if (provider === 'qweather' && code >= 150 && code < 200) return false;
-  return true;
-}
-
-function drawWeatherIcon(canvas, item, provider) {
-  const context = canvas.getContext('2d');
-  const scale = canvas.width / 96;
-  const kind = weatherKind(item && item.code, provider);
-  const day = isDaytime(item, provider);
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.save();
-  context.scale(scale, scale);
-  const sunColor = day ? '#f5b521' : '#9daed5';
-  const cloudColor = day ? '#778597' : '#8d99aa';
-  const rainColor = '#3f8bc9';
-  function sun() {
-    context.fillStyle = sunColor;
-    context.beginPath(); context.arc(40, 38, 18, 0, Math.PI * 2); context.fill();
-    context.strokeStyle = sunColor; context.lineWidth = 4;
-    for (let index = 0; index < 8; ++index) {
-      const angle = index * Math.PI / 4;
-      context.beginPath();
-      context.moveTo(40 + 23 * Math.cos(angle), 38 + 23 * Math.sin(angle));
-      context.lineTo(40 + 30 * Math.cos(angle), 38 + 30 * Math.sin(angle));
-      context.stroke();
-    }
-  }
-  function moon() {
-    context.fillStyle = sunColor;
-    context.beginPath(); context.arc(46, 43, 28, 0, Math.PI * 2); context.fill();
-    context.globalCompositeOperation = 'destination-out';
-    context.beginPath(); context.arc(60, 32, 27, 0, Math.PI * 2); context.fill();
-    context.globalCompositeOperation = 'source-over';
-  }
-  function cloud() {
-    context.fillStyle = cloudColor;
-    context.beginPath();
-    context.arc(31, 58, 21, 0, Math.PI * 2);
-    context.arc(53, 46, 27, 0, Math.PI * 2);
-    context.arc(75, 58, 19, 0, Math.PI * 2);
-    context.rect(18, 55, 75, 27);
-    context.fill();
-  }
-  function rain() {
-    context.strokeStyle = rainColor; context.lineWidth = 4; context.lineCap = 'round';
-    for (let x = 30; x <= 78; x += 16) {
-      context.beginPath(); context.moveTo(x, 79); context.lineTo(x - 6, 94); context.stroke();
-    }
-  }
-  function snow() {
-    context.strokeStyle = '#74a9d8'; context.lineWidth = 3; context.lineCap = 'round';
-    for (let x = 34; x <= 78; x += 22) {
-      for (let index = 0; index < 3; ++index) {
-        const angle = index * Math.PI / 3;
-        context.beginPath();
-        context.moveTo(x - 7 * Math.cos(angle), 84 - 7 * Math.sin(angle));
-        context.lineTo(x + 7 * Math.cos(angle), 84 + 7 * Math.sin(angle));
-        context.stroke();
-      }
-    }
-  }
-  function fog() {
-    context.strokeStyle = '#8492a3'; context.lineWidth = 4; context.lineCap = 'round';
-    for (let y = 39; y <= 81; y += 14) {
-      context.beginPath(); context.moveTo(12 + (y % 2) * 7, y); context.lineTo(86, y); context.stroke();
-    }
-  }
-  if (kind === 'clear') day ? sun() : moon();
-  else if (kind === 'partly') { day ? sun() : moon(); cloud(); }
-  else if (kind === 'fog') fog();
-  else {
-    cloud();
-    if (kind === 'snow') snow();
-    else if (kind === 'rain' || kind === 'storm') rain();
-  }
-  if (kind === 'storm') {
-    context.fillStyle = '#f5b521';
-    context.beginPath();
-    context.moveTo(57, 61); context.lineTo(42, 82); context.lineTo(54, 82);
-    context.lineTo(46, 97); context.lineTo(74, 68); context.lineTo(61, 68);
-    context.closePath(); context.fill();
-  }
-  context.restore();
-}
-
 function formatTime(value, withDate = false) {
   if (!value) return '';
   try {
@@ -284,9 +183,21 @@ function formatTemperature(value) {
   return display === null ? '--' : `${Math.round(display)}${tempUnit()}`;
 }
 
+function formatTemperatureShort(value) {
+  const display = displayTemperatureValue(value);
+  return display === null ? '--' : `${Math.round(display)}${String.fromCharCode(176)}`;
+}
+
 function formatNumber(value, suffix, digits = 0) {
   if (value === null || value === undefined || !Number.isFinite(Number(value))) return '--';
   return `${Number(value).toFixed(digits)}${suffix || ''}`;
+}
+
+function formatMeasurementUnit(value) {
+  const unit = textValue(value);
+  if (/^(?:u|\u03bc|\u00b5)g\/m(?:3|\u00b3)$/i.test(unit)) return '\u00b5g/m\u00b3';
+  if (/^mg\/m(?:3|\u00b3)$/i.test(unit)) return 'mg/m\u00b3';
+  return unit;
 }
 
 function formatWindDirection(value) {
@@ -339,6 +250,7 @@ function setLoading() {
   elements.location.textContent = state.location || 'Weather';
   elements.resolved.textContent = '';
   elements.providerState.textContent = '';
+  elements.providerState.classList.remove('warning');
   elements.condition.textContent = value.loading;
   elements.temperature.textContent = '--';
   elements.unit.textContent = tempUnit();
@@ -349,10 +261,16 @@ function setLoading() {
   elements.precip.textContent = '--';
   elements.visibility.textContent = '--';
   elements.alerts.hidden = true;
+  elements.alerts.replaceChildren();
   elements.minuteSection.hidden = true;
   elements.airSection.hidden = true;
+  elements.aqiScaleDot.style.left = '0%';
+  elements.airAdvice.textContent = '';
+  elements.airAdvice.hidden = true;
   elements.hourly.replaceChildren();
   elements.forecast.replaceChildren();
+  setWeatherGlyph(elements.currentGlyph, { code: '999', isDay: 1 }, 'qweather');
+  elements.currentGlyph.setAttribute('aria-label', value.loading);
   drawWeatherIcon(elements.currentIcon, { code: '999', isDay: 1 }, 'qweather');
 }
 
@@ -426,8 +344,10 @@ function renderAlerts() {
   elements.alerts.hidden = alerts.length === 0;
   for (const alert of alerts) {
     const details = document.createElement('details');
+    const color = alertColor(alert);
     details.className = 'alert';
-    details.style.setProperty('--alert-color', alertColor(alert));
+    details.style.setProperty('--alert-color', color);
+    details.open = color === '#b3261e' || color === '#c55318';
     const summary = document.createElement('summary');
     const level = document.createElement('span');
     level.className = 'alert-level';
@@ -492,7 +412,10 @@ function renderMinuteForecast() {
     elements.minuteChart.append(bar);
   }
   elements.minuteAxis.replaceChildren();
-  for (const label of ['0', '30', '60', '90', '120 min']) {
+  const axisLabels = isChinese()
+    ? ['\u73b0\u5728', '30 \u5206\u949f', '60 \u5206\u949f', '90 \u5206\u949f', '120 \u5206\u949f']
+    : ['Now', '30 min', '60 min', '90 min', '120 min'];
+  for (const label of axisLabels) {
     const span = document.createElement('span');
     span.textContent = label;
     elements.minuteAxis.append(span);
@@ -521,17 +444,23 @@ function renderHourly() {
     const time = document.createElement('div');
     time.className = 'hour-time';
     time.textContent = index === 0 && source.provider === 'open-meteo' ? value.now : formatTime(row.time);
-    const icon = document.createElement('canvas');
-    icon.width = 48; icon.height = 48;
-    drawWeatherIcon(icon, row, source.provider);
+    const descriptionText = weatherText(row, source.provider);
+    const icon = document.createElement('i');
+    icon.className = 'weather-glyph';
+    icon.setAttribute('role', 'img');
+    icon.setAttribute('aria-label', descriptionText);
+    setWeatherGlyph(icon, row, source.provider);
     const temperature = document.createElement('div');
     temperature.className = 'hour-temp';
     temperature.textContent = formatTemperature(row.temp);
+    const description = document.createElement('div');
+    description.className = 'hour-text';
+    description.textContent = descriptionText;
     const probability = document.createElement('div');
     probability.className = 'hour-prob';
     probability.textContent = row.pop === null || row.pop === undefined ? '--' : `${row.pop}%`;
-    probability.title = weatherText(row, source.provider);
-    hour.append(time, icon, temperature, probability);
+    probability.title = `${value.rainChance}: ${probability.textContent}`;
+    hour.append(time, icon, temperature, description, probability);
     elements.hourly.append(hour);
   }
   if (!rows.length) {
@@ -558,15 +487,19 @@ function renderAirQuality() {
     elements.airNote.textContent = value.unavailable;
     elements.aqiValue.textContent = '--';
     elements.aqiCategory.textContent = '';
+    elements.aqiScaleDot.style.left = '0%';
     elements.pollutants.replaceChildren();
     elements.airAdvice.textContent = '';
+    elements.airAdvice.hidden = true;
     return;
   }
   elements.airSection.hidden = false;
-  elements.airNote.textContent = air.primary ? `${isChinese() ? '\u9996\u8981\u6c61\u67d3\u7269' : 'Primary'}: ${air.primary}` : '';
+  elements.airNote.textContent = air.primary ? `${value.primary}: ${air.primary}` : '';
   elements.aqiValue.textContent = air.aqi === null ? '--' : Math.round(air.aqi);
   elements.aqiValue.style.color = aqiColor(air.aqi);
-  elements.aqiCategory.textContent = [air.category, air.level ? `${isChinese() ? '\u7b49\u7ea7' : 'Level'} ${air.level}` : ''].filter(Boolean).join(' | ');
+  elements.aqiCategory.textContent = [air.category, air.level ? `${value.level} ${air.level}` : ''].filter(Boolean).join(' | ');
+  const aqiPosition = air.aqi === null ? 0 : Math.max(0, Math.min(100, Number(air.aqi) / 300 * 100));
+  elements.aqiScaleDot.style.left = `${aqiPosition}%`;
   elements.pollutants.replaceChildren();
   for (const pollutant of (air.pollutants || []).slice(0, 6)) {
     const item = document.createElement('div');
@@ -577,11 +510,14 @@ function renderAirQuality() {
     const number = document.createElement('span');
     number.className = 'pollutant-value';
     number.textContent = formatNumber(pollutant.value, '', pollutant.code === 'co' ? 1 : 0);
-    number.title = pollutant.unit;
-    item.append(name, number);
+    const unit = document.createElement('span');
+    unit.className = 'pollutant-unit';
+    unit.textContent = formatMeasurementUnit(pollutant.unit);
+    item.append(name, number, unit);
     elements.pollutants.append(item);
   }
   elements.airAdvice.textContent = air.advice || '';
+  elements.airAdvice.hidden = !elements.airAdvice.textContent;
 }
 
 function renderDaily() {
@@ -590,28 +526,79 @@ function renderDaily() {
   const rows = Array.isArray(source.rows) ? source.rows.slice(0, 5) : [];
   elements.forecast.replaceChildren();
   elements.dailyNote.textContent = rows.length ? '' : value.unavailable;
-  const formatter = new Intl.DateTimeFormat(state.language || 'en-US', { weekday: 'short' });
+  if (!rows.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = value.unavailable;
+    elements.forecast.append(empty);
+    return;
+  }
+  const weekdayFormatter = new Intl.DateTimeFormat(state.language || 'en-US', { weekday: 'short' });
+  const dateFormatter = new Intl.DateTimeFormat(state.language || 'en-US', { month: 'numeric', day: 'numeric' });
+  const temperatures = rows.flatMap((row) => [row.tempMin, row.tempMax]).map(Number).filter(Number.isFinite);
+  const overallMin = temperatures.length ? Math.min(...temperatures) : 0;
+  const overallMax = temperatures.length ? Math.max(...temperatures) : 1;
+  const temperatureSpan = Math.max(1, overallMax - overallMin);
   for (let index = 0; index < rows.length; ++index) {
     const row = rows[index];
     const day = document.createElement('div');
     day.className = 'day';
+    const date = document.createElement('div');
+    date.className = 'day-date';
     const name = document.createElement('div');
     name.className = 'day-name';
+    const subdate = document.createElement('span');
+    subdate.className = 'day-subdate';
     try {
-      name.textContent = index === 0 ? value.today : formatter.format(new Date(`${row.date}T12:00:00`));
+      const parsedDate = new Date(`${row.date}T12:00:00`);
+      name.textContent = index === 0 ? value.today : weekdayFormatter.format(parsedDate);
+      subdate.textContent = dateFormatter.format(parsedDate);
     } catch (error) {
       name.textContent = row.date;
+      subdate.textContent = '';
     }
-    const icon = document.createElement('canvas');
-    icon.width = 48; icon.height = 48;
-    drawWeatherIcon(icon, row, source.provider);
+    date.append(name, subdate);
+    const weather = document.createElement('div');
+    weather.className = 'day-weather';
+    const descriptionText = weatherText(row, source.provider);
+    const icon = document.createElement('i');
+    icon.className = 'weather-glyph';
+    icon.setAttribute('role', 'img');
+    icon.setAttribute('aria-label', descriptionText);
+    setWeatherGlyph(icon, row, source.provider);
     const text = document.createElement('div');
     text.className = 'day-text';
-    text.textContent = weatherText(row, source.provider);
-    const temperature = document.createElement('div');
-    temperature.className = 'day-temp';
-    temperature.textContent = `${formatTemperature(row.tempMax)} / ${formatTemperature(row.tempMin)}`;
-    day.append(name, icon, text, temperature);
+    text.textContent = descriptionText;
+    const probability = document.createElement('div');
+    probability.className = 'day-pop';
+    probability.textContent = row.pop === null || row.pop === undefined ? `${value.rain} --` : `${value.rain} ${row.pop}%`;
+    weather.append(icon, text, probability);
+    const range = document.createElement('div');
+    range.className = 'day-range';
+    const low = document.createElement('span');
+    low.className = 'day-low';
+    low.textContent = formatTemperatureShort(row.tempMin);
+    const track = document.createElement('div');
+    track.className = 'day-track';
+    const fill = document.createElement('span');
+    fill.className = 'day-range-fill';
+    const min = Number(row.tempMin);
+    const max = Number(row.tempMax);
+    if (Number.isFinite(min) && Number.isFinite(max)) {
+      let left = Math.max(0, Math.min(100, (min - overallMin) / temperatureSpan * 100));
+      const width = Math.max(8, Math.min(100, (max - min) / temperatureSpan * 100));
+      left = Math.min(left, 100 - width);
+      fill.style.left = `${left}%`;
+      fill.style.width = `${width}%`;
+    } else {
+      fill.hidden = true;
+    }
+    track.append(fill);
+    const high = document.createElement('span');
+    high.className = 'day-high';
+    high.textContent = formatTemperatureShort(row.tempMax);
+    range.append(low, track, high);
+    day.append(date, weather, range);
     elements.forecast.append(day);
   }
 }
@@ -650,16 +637,18 @@ function qweatherAttributionUrl() {
 function renderSources() {
   const value = labels();
   elements.poweredBy.replaceChildren();
+  const attribution = document.createElement('span');
+  attribution.textContent = 'QWeather Icons';
   if (state.mode === 'qweather') {
     const link = document.createElement('a');
     link.href = qweatherAttributionUrl();
     link.textContent = value.powered;
-    elements.poweredBy.append(link);
+    elements.poweredBy.append(link, document.createTextNode(' · '), attribution);
   } else {
     const link = document.createElement('a');
     link.href = 'https://open-meteo.com/';
     link.textContent = 'Open-Meteo';
-    elements.poweredBy.append(link);
+    elements.poweredBy.append(link, document.createTextNode(' · '), attribution);
   }
   const sources = collectSources();
   elements.sourceList.textContent = sources.length ? `${value.sources}: ${sources.join(', ')}` : '';
@@ -679,7 +668,7 @@ function renderWeather() {
   const resolvedParts = [state.place && state.place.city, state.place && state.place.country]
     .map((part) => textValue(part))
     .filter((part, index, array) => part && array.indexOf(part) === index && part !== elements.location.textContent);
-  elements.resolved.textContent = resolvedParts.length ? ` | ${resolvedParts.join(' | ')}` : '';
+  elements.resolved.textContent = resolvedParts.join(' \u00b7 ');
   renderProviderState();
   elements.temperature.textContent = Math.round(displayTemperatureValue(item.temp));
   elements.unit.textContent = tempUnit();
@@ -700,6 +689,8 @@ function renderWeather() {
   elements.wind.textContent = `${item.windDir ? `${formatWindDirection(item.windDir)} ` : ''}${formatNumber(windSpeed, state.unit ? ' mph' : ' km/h')}`;
   elements.precip.textContent = formatNumber(precipitation, state.unit ? ' in' : ' mm', state.unit ? 2 : 1);
   elements.visibility.textContent = formatNumber(visibility, state.unit ? ' mi' : ' km', 0);
+  setWeatherGlyph(elements.currentGlyph, item, current.provider);
+  elements.currentGlyph.setAttribute('aria-label', weatherText(item, current.provider));
   drawWeatherIcon(elements.currentIcon, item, current.provider);
   renderAlerts();
   renderMinuteForecast();
@@ -734,7 +725,7 @@ function imageHex(width, height) {
   const outputWidth = Math.max(1, Math.min(64, Number(width) || 32));
   const outputHeight = Math.max(1, Math.min(64, Number(height) || outputWidth));
   const source = elements.currentIcon;
-  const sourceContext = source.getContext('2d');
+  const sourceContext = source.getContext('2d', { willReadFrequently: true });
   const pixels = sourceContext.getImageData(0, 0, source.width, source.height).data;
   let left = source.width, top = source.height, right = -1, bottom = -1;
   for (let y = 0; y < source.height; ++y) {
@@ -747,7 +738,7 @@ function imageHex(width, height) {
   }
   const canvas = document.createElement('canvas');
   canvas.width = outputWidth; canvas.height = outputHeight;
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext('2d', { willReadFrequently: true });
   if (right >= left && bottom >= top) {
     const padding = 2;
     left = Math.max(0, left - padding); top = Math.max(0, top - padding);
@@ -827,9 +818,13 @@ if (window.__epWeatherTestMode) {
     validQWeatherHost,
     refreshDue,
     DATASET_TTL,
+    weatherIconCode,
+    weatherIconGlyph,
+    weatherIconFontReady: () => weatherIconFontLoaded,
     renderWeather,
     contentHeight
   });
 }
 
 setLoading();
+initializeWeatherIconFont();

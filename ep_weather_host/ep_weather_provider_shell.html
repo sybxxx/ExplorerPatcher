@@ -3,147 +3,318 @@
 <head>
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
 <title>Weather</title>
 <style>
+/*__EP_QWEATHER_ICON_FONT__*/
+
 :root {
-  color-scheme: light dark;
-  font-family: "Segoe UI", sans-serif;
+  color-scheme: light;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
   letter-spacing: 0;
-  --text: #202124;
-  --muted: #5f6368;
-  --line: rgba(32, 33, 36, .14);
-  --surface: rgba(255, 255, 255, .58);
-  --surface-strong: rgba(255, 255, 255, .82);
-  --blue: #286fa8;
-  --cyan: #0d7f88;
-  --green: #347a43;
+  --panel: #fbfcfe;
+  --surface: #f2f5f8;
+  --surface-strong: #ffffff;
+  --surface-hover: #eaf0f5;
+  --text: #1f2328;
+  --muted: #687483;
+  --faint: #8793a2;
+  --line: #d9e0e7;
+  --blue: #087db9;
+  --blue-soft: #e2f2fa;
+  --green: #248447;
+  --green-soft: #e5f5e9;
   --amber: #9a6500;
-  --orange: #b64b1a;
+  --orange: #c44f18;
   --red: #b3261e;
+  --icon: #087db9;
 }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --panel: #171b21;
+  --surface: #1f252d;
+  --surface-strong: #252c35;
+  --surface-hover: #2b343e;
+  --text: #f2f4f7;
+  --muted: #aab5c2;
+  --faint: #7e8b9a;
+  --line: #353e49;
+  --blue: #6bc4f1;
+  --blue-soft: #203a49;
+  --green: #6fd18b;
+  --green-soft: #203a2a;
+  --amber: #e5b657;
+  --orange: #f29a70;
+  --red: #ff8a80;
+  --icon: #6bc4f1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --panel: #171b21;
+    --surface: #1f252d;
+    --surface-strong: #252c35;
+    --surface-hover: #2b343e;
+    --text: #f2f4f7;
+    --muted: #aab5c2;
+    --faint: #7e8b9a;
+    --line: #353e49;
+    --blue: #6bc4f1;
+    --blue-soft: #203a49;
+    --green: #6fd18b;
+    --green-soft: #203a2a;
+    --amber: #e5b657;
+    --orange: #f29a70;
+    --red: #ff8a80;
+    --icon: #6bc4f1;
+  }
+}
+
 * { box-sizing: border-box; }
-html, body { margin: 0; width: 100%; height: 100%; min-height: 100%; background: transparent; overflow: hidden; }
+html, body {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
 body { color: var(--text); }
 button, input, select, textarea { font: inherit; }
 a { color: inherit; }
-#weather { width: 100%; height: 100%; min-height: 353px; padding: 16px 20px 11px; overflow-x: hidden; overflow-y: auto; }
-.muted { color: var(--muted); }
-.location-row { display: flex; align-items: center; min-width: 0; gap: 8px; }
-.location-mark { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: var(--red); }
-.location { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 600; }
-.resolved { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.provider-state { margin-left: auto; flex: 0 0 auto; font-size: 11px; color: var(--muted); }
-.provider-state.warning { color: var(--orange); font-weight: 600; }
-.current-grid { display: grid; grid-template-columns: 92px minmax(130px, 1fr) minmax(155px, auto); align-items: center; column-gap: 14px; margin-top: 12px; }
-#current-icon { width: 92px; height: 92px; }
-.temperature { font-size: 52px; line-height: 1; font-weight: 650; white-space: nowrap; }
-.temperature small { margin-left: 3px; vertical-align: top; font-size: 23px; font-weight: 500; }
-.condition-wrap { min-width: 0; text-align: right; }
-.condition { font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
-.updated { margin-top: 5px; font-size: 11px; }
-.details { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; margin-top: 10px; border: 1px solid var(--line); background: var(--line); }
-.detail { min-width: 0; padding: 7px 7px 6px; background: var(--surface-strong); text-align: center; }
-.detail-label { display: block; font-size: 10px; color: var(--muted); white-space: nowrap; }
-.detail-value { display: block; margin-top: 1px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.section { padding-top: 11px; }
-.section + .section { margin-top: 11px; border-top: 1px solid var(--line); }
-.section-title-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
-.section-title { font-size: 13px; font-weight: 650; }
-.section-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--muted); }
-.alerts { display: grid; gap: 6px; padding-top: 10px; }
-.alert { border: 1px solid rgba(179, 38, 30, .35); border-left: 4px solid var(--alert-color, var(--red)); background: rgba(179, 38, 30, .07); }
-.alert summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 34px; padding: 6px 8px; cursor: pointer; list-style: none; }
+[hidden] { display: none !important; }
+
+#weather {
+  width: 100%;
+  height: 100%;
+  min-height: 353px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  background: var(--panel);
+}
+#weather::-webkit-scrollbar { width: 8px; }
+#weather::-webkit-scrollbar-track { background: transparent; }
+#weather::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: var(--faint); background-clip: padding-box; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 54px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.location-row { display: flex; align-items: baseline; min-width: 0; gap: 8px; }
+.location-mark { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--red); }
+.location { min-width: 0; overflow: hidden; font-size: 18px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.resolved { min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.provider-state { max-width: 46%; flex: 0 0 auto; color: var(--muted); font-size: 11px; text-align: right; }
+.provider-state.warning { color: var(--orange); font-weight: 650; }
+
+.alerts { display: grid; gap: 7px; margin: 12px 20px 0; }
+.alert {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--alert-color, var(--red));
+  border-radius: 8px;
+  background: var(--surface);
+}
+.alert summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 7px 12px 7px 10px;
+  cursor: pointer;
+  list-style: none;
+}
 .alert summary::-webkit-details-marker { display: none; }
-.alert-level { padding: 2px 5px; border-radius: 4px; color: #fff; background: var(--alert-color, var(--red)); font-size: 10px; font-weight: 700; }
-.alert-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 650; }
-.alert-time { font-size: 10px; color: var(--muted); white-space: nowrap; }
-.alert-body { max-height: 210px; overflow: auto; padding: 1px 10px 9px 43px; font-size: 11px; line-height: 1.55; }
-.alert-meta { margin-bottom: 5px; color: var(--muted); }
-.alert-block + .alert-block { margin-top: 7px; }
-.alert-block strong { display: block; margin-bottom: 2px; font-size: 10px; color: var(--muted); }
-.minute-summary { font-size: 12px; font-weight: 600; }
-.minute-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 2px; height: 48px; margin-top: 7px; padding-top: 4px; border-bottom: 1px solid var(--line); }
-.minute-bar { min-height: 2px; background: var(--blue); }
-.minute-axis { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 3px; font-size: 9px; color: var(--muted); }
+.alert summary::after {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  content: "";
+  transform: rotate(45deg) translateY(-2px);
+}
+.alert[open] summary::after { transform: rotate(225deg) translate(-2px, -1px); }
+.alert-level { padding: 2px 6px; border-radius: 4px; color: #fff; background: var(--alert-color, var(--red)); font-size: 10px; font-weight: 700; }
+.alert-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.alert-time { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.alert-body { padding: 0 14px 12px 51px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.alert-meta { margin-bottom: 6px; }
+.alert-block + .alert-block { margin-top: 8px; }
+.alert-block strong { display: block; margin-bottom: 2px; color: var(--text); font-size: 10px; }
+
+.hero-section { padding: 18px 20px 16px; }
+.hero-main { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.hero-primary { display: flex; align-items: center; min-width: 0; gap: 15px; }
+.weather-glyph {
+  display: inline-grid;
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--icon);
+  font-family: "QWeather Icons" !important;
+  font-style: normal;
+  font-weight: 400;
+  font-variant: normal;
+  line-height: 1;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+}
+.current-glyph { width: 88px; height: 88px; font-size: 82px; }
+#current-icon { display: none; }
+.temperature { display: flex; align-items: flex-start; white-space: nowrap; }
+.temperature span { font-size: 64px; font-weight: 700; line-height: .95; }
+.temperature small { margin: 3px 0 0 3px; color: var(--muted); font-size: 25px; font-weight: 500; }
+.condition-wrap { min-width: 0; text-align: right; }
+.condition { overflow-wrap: anywhere; font-size: 21px; font-weight: 700; }
+.updated { margin-top: 5px; color: var(--muted); font-size: 11px; }
+
+.details { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.detail { min-width: 0; min-height: 59px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.detail-label { display: block; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.detail-value { display: block; margin-top: 5px; overflow: hidden; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+
+.section { padding: 17px 20px 19px; border-top: 1px solid var(--line); }
+.section-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 11px; }
+.section-title-group { display: flex; align-items: baseline; min-width: 0; gap: 8px; }
+.section-title { flex: 0 0 auto; font-size: 14px; font-weight: 700; }
+.section-note { min-width: 0; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.section-surface { overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.empty { padding: 13px; color: var(--muted); font-size: 11px; }
+
+.minute-surface { padding: 13px 15px 11px; }
+.minute-summary { color: var(--orange); font-size: 12px; font-weight: 650; }
+.minute-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 3px; height: 64px; margin-top: 10px; padding-top: 4px; border-bottom: 1px solid var(--line); }
+.minute-bar { min-height: 2px; border-radius: 3px 3px 0 0; background: var(--blue); }
+.minute-axis { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 5px; color: var(--faint); font-size: 9px; }
 .minute-axis span:nth-child(2), .minute-axis span:nth-child(3), .minute-axis span:nth-child(4) { text-align: center; }
 .minute-axis span:last-child { text-align: right; }
-.hourly { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: 76px; gap: 4px 2px; }
-.hour { min-width: 0; height: 76px; padding: 2px 0; text-align: center; }
-.hour-time, .hour-temp, .hour-prob { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hour-time { font-size: 10px; }
-.hour canvas { display: block; width: 27px; height: 27px; margin: 1px auto 0; }
-.hour-temp { font-size: 10px; color: var(--muted); }
-.hour-prob { margin-top: 1px; font-size: 11px; font-weight: 650; color: var(--blue); }
-.air-grid { display: grid; grid-template-columns: 100px 1fr; gap: 12px; align-items: center; }
-.aqi-main { border-right: 1px solid var(--line); text-align: center; }
-.aqi-value { font-size: 30px; line-height: 1; font-weight: 700; }
-.aqi-category { margin-top: 3px; font-size: 11px; font-weight: 600; }
-.pollutants { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
-.pollutant { min-width: 0; text-align: center; }
-.pollutant-name { display: block; font-size: 9px; color: var(--muted); white-space: nowrap; }
-.pollutant-value { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.air-advice { margin-top: 7px; font-size: 10px; color: var(--muted); }
-.forecast { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
-.day { min-width: 0; padding: 3px 2px; text-align: center; }
-.day-name { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.day canvas { display: block; width: 36px; height: 36px; margin: 2px auto; }
-.day-text { min-height: 15px; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.day-temp { font-size: 11px; white-space: nowrap; }
-.empty { padding: 9px 0; font-size: 11px; color: var(--muted); }
-footer { display: flex; justify-content: flex-end; gap: 5px; margin-top: 10px; font-size: 9px; color: var(--muted); }
-footer .source-list { max-width: 68%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-[hidden] { display: none !important; }
-@media (max-width: 520px) {
-  #weather { padding-left: 14px; padding-right: 14px; }
-  .location-row { flex-wrap: wrap; }
-  .provider-state { width: calc(100% - 17px); margin-left: 17px; }
-  .current-grid { grid-template-columns: 76px minmax(90px, 1fr) minmax(64px, auto); column-gap: 9px; }
-  #current-icon { width: 76px; height: 76px; }
-  .temperature { font-size: 43px; }
-  .temperature small { font-size: 19px; }
-  .condition { font-size: 16px; }
+
+.hourly { display: flex; gap: 4px; min-height: 116px; padding: 9px 9px 6px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; }
+.hourly::-webkit-scrollbar { height: 7px; }
+.hourly::-webkit-scrollbar-track { background: transparent; }
+.hourly::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 7px; background: var(--faint); background-clip: padding-box; }
+.hour { width: 70px; min-width: 70px; height: 96px; padding: 5px 3px; border-radius: 7px; text-align: center; scroll-snap-align: start; }
+.hour:hover { background: var(--surface-hover); }
+.hour-time, .hour-temp, .hour-text, .hour-prob { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hour-time { color: var(--muted); font-size: 10px; }
+.hour .weather-glyph { margin: 4px auto 2px; font-size: 28px; }
+.hour-temp { font-size: 12px; font-weight: 700; }
+.hour-text { margin-top: 1px; color: var(--muted); font-size: 10px; }
+.hour-prob { margin-top: 3px; color: var(--blue); font-size: 10px; font-weight: 700; }
+
+.air-surface { padding: 14px 15px 12px; }
+.air-grid { display: grid; grid-template-columns: 124px minmax(0, 1fr); align-items: center; gap: 16px; }
+.aqi-main { padding-right: 16px; border-right: 1px solid var(--line); text-align: center; }
+.aqi-value { font-size: 40px; font-weight: 750; line-height: 1; }
+.aqi-category { margin-top: 4px; font-size: 11px; font-weight: 650; }
+.aqi-scale { position: relative; width: 86px; height: 4px; margin: 9px auto 0; border-radius: 4px; background: linear-gradient(90deg, #2fa458 0%, #d3a700 35%, #e87522 65%, #c83c35 100%); }
+.aqi-scale-dot { position: absolute; top: -3px; left: 0; width: 10px; height: 10px; margin-left: -5px; border: 2px solid var(--surface-strong); border-radius: 50%; background: var(--text); }
+.pollutants { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.pollutant { min-width: 0; padding: 3px 6px; border-left: 1px solid var(--line); text-align: center; }
+.pollutant:first-child { border-left: 0; }
+.pollutant-name, .pollutant-value, .pollutant-unit { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pollutant-name { color: var(--muted); font-size: 9px; }
+.pollutant-value { margin-top: 3px; font-size: 12px; font-weight: 700; }
+.pollutant-unit { margin-top: 1px; color: var(--faint); font-size: 8px; }
+.air-advice { margin-top: 12px; padding: 7px 9px; border-left: 3px solid var(--green); background: var(--green-soft); color: var(--green); font-size: 10px; }
+
+.forecast { overflow: hidden; }
+.day { display: grid; grid-template-columns: 80px 145px minmax(150px, 1fr); align-items: center; gap: 12px; min-height: 55px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.day:last-child { border-bottom: 0; }
+.day:hover { background: var(--surface-hover); }
+.day-date { min-width: 0; }
+.day-name, .day-subdate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.day-name { font-size: 12px; font-weight: 700; }
+.day-subdate { margin-top: 2px; color: var(--faint); font-size: 9px; }
+.day-weather { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; }
+.day .weather-glyph { grid-row: 1 / span 2; font-size: 26px; }
+.day-text, .day-pop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.day-text { font-size: 11px; font-weight: 650; }
+.day-pop { color: var(--blue); font-size: 9px; font-weight: 700; }
+.day-range { display: grid; grid-template-columns: 34px minmax(70px, 1fr) 34px; align-items: center; gap: 8px; min-width: 0; }
+.day-low, .day-high { font-size: 10px; white-space: nowrap; }
+.day-low { color: var(--faint); text-align: right; }
+.day-high { font-weight: 700; }
+.day-track { position: relative; height: 5px; overflow: hidden; border-radius: 5px; background: var(--line); }
+.day-range-fill { position: absolute; top: 0; bottom: 0; border-radius: 5px; background: linear-gradient(90deg, #48aeda, #e77b2c); }
+
+footer { display: flex; justify-content: flex-end; gap: 5px; padding: 10px 20px 12px; border-top: 1px solid var(--line); color: var(--faint); font-size: 9px; }
+footer a { color: var(--blue); text-underline-offset: 2px; }
+footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 620px) {
+  .topbar, .hero-section, .section { padding-right: 15px; padding-left: 15px; }
+  .alerts { margin-right: 15px; margin-left: 15px; }
+  .hero-main { align-items: flex-start; }
+  .current-glyph { width: 78px; height: 78px; font-size: 72px; }
+  .temperature span { font-size: 54px; }
+  .temperature small { font-size: 21px; }
   .details { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .detail:last-child { grid-column: span 2; }
-  .hourly { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .air-grid { grid-template-columns: 78px 1fr; gap: 7px; }
-  .pollutants { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .forecast { grid-template-columns: repeat(5, minmax(58px, 1fr)); overflow-x: auto; }
-  footer { justify-content: flex-start; flex-wrap: wrap; }
-  footer .source-list { max-width: 100%; width: 100%; }
+  .air-grid { grid-template-columns: 100px minmax(0, 1fr); gap: 10px; }
+  .aqi-main { padding-right: 10px; }
+  .pollutants { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; }
+  .pollutant:nth-child(4) { border-left: 0; }
+  .day { grid-template-columns: 65px 120px minmax(115px, 1fr); gap: 8px; padding-right: 10px; padding-left: 10px; }
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #f1f3f4;
-    --muted: #b8bdc7;
-    --line: rgba(255, 255, 255, .15);
-    --surface: rgba(27, 30, 34, .58);
-    --surface-strong: rgba(34, 38, 43, .84);
-    --blue: #70b7ef;
-    --cyan: #65c8cf;
-    --green: #77c587;
-    --amber: #e5b455;
-    --orange: #f39a72;
-    --red: #ff8a80;
-  }
+
+@media (max-width: 440px) {
+  .topbar { align-items: flex-start; }
+  .resolved { display: none; }
+  .provider-state { max-width: 45%; }
+  .alert summary { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .alert-time { display: none; }
+  .alert-body { padding-left: 12px; }
+  .hero-main { flex-direction: column; gap: 9px; }
+  .condition-wrap { text-align: left; }
+  .condition { font-size: 18px; }
+  .details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail:last-child { grid-column: 1 / -1; }
+  .section-title-row { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .section-title-group { width: 100%; }
+  .minute-chart { gap: 2px; }
+  .air-grid { grid-template-columns: 1fr; }
+  .aqi-main { padding: 0 0 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .day { grid-template-columns: 54px 92px minmax(105px, 1fr); gap: 6px; }
+  .day-range { grid-template-columns: 29px minmax(50px, 1fr) 29px; gap: 5px; }
+  footer { justify-content: flex-start; flex-wrap: wrap; padding-right: 15px; padding-left: 15px; }
+  footer .source-list { width: 100%; max-width: 100%; }
 }
 </style>
 </head>
 <body>
 <main id="weather" aria-live="polite">
-  <header>
+  <header class="topbar">
     <div class="location-row">
       <span class="location-mark" aria-hidden="true"></span>
       <span class="location" id="location">Weather</span>
-      <span class="resolved muted" id="resolved"></span>
-      <span class="provider-state" id="provider-state"></span>
+      <span class="resolved" id="resolved"></span>
     </div>
-    <div class="alerts" id="alerts" hidden></div>
-    <div class="current-grid">
-      <canvas id="current-icon" width="96" height="96"></canvas>
-      <div class="temperature"><span id="temperature">--</span><small id="unit">&#176;C</small></div>
+    <span class="provider-state" id="provider-state"></span>
+  </header>
+
+  <div class="alerts" id="alerts" hidden></div>
+
+  <section class="hero-section" aria-label="Current weather">
+    <div class="hero-main">
+      <div class="hero-primary">
+        <i class="weather-glyph current-glyph" id="current-glyph" role="img"></i>
+        <canvas id="current-icon" width="96" height="96" aria-hidden="true"></canvas>
+        <div class="temperature"><span id="temperature">--</span><small id="unit">&#176;C</small></div>
+      </div>
       <div class="condition-wrap">
         <div class="condition" id="condition">Loading...</div>
-        <div class="updated muted" id="updated"></div>
+        <div class="updated" id="updated"></div>
       </div>
     </div>
     <div class="details">
@@ -153,32 +324,48 @@ footer .source-list { max-width: 68%; overflow: hidden; text-overflow: ellipsis;
       <div class="detail"><span class="detail-label" id="precip-label">Precipitation</span><span class="detail-value" id="precip">--</span></div>
       <div class="detail"><span class="detail-label" id="visibility-label">Visibility</span><span class="detail-value" id="visibility">--</span></div>
     </div>
-  </header>
+  </section>
 
   <section class="section" id="minute-section" hidden>
-    <div class="section-title-row"><span class="section-title" id="minute-title">Next 2 hours</span><span class="section-note" id="minute-updated"></span></div>
-    <div class="minute-summary" id="minute-summary"></div>
-    <div class="minute-chart" id="minute-chart"></div>
-    <div class="minute-axis" id="minute-axis"></div>
+    <div class="section-title-row">
+      <div class="section-title-group"><span class="section-title" id="minute-title">Next 2 hours</span><span class="section-note" id="minute-updated"></span></div>
+    </div>
+    <div class="section-surface minute-surface">
+      <div class="minute-summary" id="minute-summary"></div>
+      <div class="minute-chart" id="minute-chart"></div>
+      <div class="minute-axis" id="minute-axis"></div>
+    </div>
   </section>
 
   <section class="section" id="hourly-section">
-    <div class="section-title-row"><span class="section-title" id="hourly-title">24-hour forecast</span><span class="section-note" id="hourly-note"></span></div>
-    <div class="hourly" id="hourly"></div>
+    <div class="section-title-row">
+      <div class="section-title-group"><span class="section-title" id="hourly-title">24-hour forecast</span><span class="section-note" id="hourly-note"></span></div>
+    </div>
+    <div class="section-surface"><div class="hourly" id="hourly"></div></div>
   </section>
 
   <section class="section" id="air-section" hidden>
-    <div class="section-title-row"><span class="section-title" id="air-title">Air quality</span><span class="section-note" id="air-note"></span></div>
-    <div class="air-grid">
-      <div class="aqi-main"><div class="aqi-value" id="aqi-value">--</div><div class="aqi-category" id="aqi-category"></div></div>
-      <div class="pollutants" id="pollutants"></div>
+    <div class="section-title-row">
+      <div class="section-title-group"><span class="section-title" id="air-title">Air quality</span><span class="section-note" id="air-note"></span></div>
     </div>
-    <div class="air-advice" id="air-advice"></div>
+    <div class="section-surface air-surface">
+      <div class="air-grid">
+        <div class="aqi-main">
+          <div class="aqi-value" id="aqi-value">--</div>
+          <div class="aqi-category" id="aqi-category"></div>
+          <div class="aqi-scale" aria-hidden="true"><span class="aqi-scale-dot" id="aqi-scale-dot"></span></div>
+        </div>
+        <div class="pollutants" id="pollutants"></div>
+      </div>
+      <div class="air-advice" id="air-advice" hidden></div>
+    </div>
   </section>
 
   <section class="section" id="daily-section">
-    <div class="section-title-row"><span class="section-title" id="daily-title">5-day forecast</span><span class="section-note" id="daily-note"></span></div>
-    <div class="forecast" id="forecast"></div>
+    <div class="section-title-row">
+      <div class="section-title-group"><span class="section-title" id="daily-title">5-day forecast</span><span class="section-note" id="daily-note"></span></div>
+    </div>
+    <div class="section-surface forecast" id="forecast"></div>
   </section>
 
   <footer>
@@ -190,6 +377,7 @@ footer .source-list { max-width: 68%; overflow: hidden; text-overflow: ellipsis;
 (function() {
 'use strict';
 /*__EP_WEATHER_DATA__*/
+/*__EP_WEATHER_ICONS__*/
 /*__EP_WEATHER_UI__*/
 })();
 </script>

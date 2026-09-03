@@ -38,13 +38,30 @@ Without valid QWeather credentials, or when the first QWeather current-condition
 
 QWeather mode displays the required QWeather attribution, uses the official `metadata.attributions` link when supplied, and preserves source names returned in each API response's `refer.sources` field. The local page creates source links without loading remote pages inside the weather WebView.
 
+## UI and official icons
+
+The popup uses the locally vendored QWeather Icons 1.8.0 font. The provider
+generator embeds the WOFF2 data directly in the generated weather document, so
+icons do not depend on a relative file path or a CDN at runtime. QWeather API
+icon codes map directly to official glyphs; Open-Meteo fallback conditions map
+to the closest QWeather weather glyph.
+
+The same official filled glyph is rendered to an off-screen canvas for the
+native taskbar bitmap. The popup itself uses a single vertically scrollable
+container capped by the existing host height policy. The 24-hour strip can be
+dragged or scrolled horizontally, but it never intercepts the normal vertical
+mouse wheel used to move through the popup.
+
 ## Source and verification
 
 The maintainable provider sources are:
 
 - `ep_weather_host/ep_weather_provider_shell.html`
 - `ep_weather_host/ep_weather_provider_data.js`
+- `ep_weather_host/ep_weather_provider_icons.js`
 - `ep_weather_host/ep_weather_provider_ui.js`
+- `ep_weather_host/assets/qweather-icons-1.8.0.woff2`
+- `ep_weather_host/assets/qweather-icons-1.8.0.json`
 
 Run the following after editing them:
 
@@ -54,6 +71,6 @@ node ep_weather_host\verify_open_meteo_provider.js
 pwsh -File ep_weather_host\verify_qweather_config.ps1
 ```
 
-The generated `ep_weather_provider_open_meteo_html.h` remains the C build input for compatibility with the existing weather provider. The verifiers check source/header synchronization, JavaScript syntax, required endpoints and lifecycle limits, current QWeather response normalization, native header injection, strict API Host matching, and DPAPI storage.
+The generated `ep_weather_provider_open_meteo_html.h` remains the C build input for compatibility with the existing weather provider. The verifiers check source/header synchronization, bounded C string literals, embedded official icon assets, JavaScript syntax, required endpoints and lifecycle limits, current QWeather response normalization, native header injection, strict API Host matching, vertical scrolling behavior, and DPAPI storage.
 
 Real API acceptance still requires an account-specific API Host and API Key. Never add either value to test fixtures, logs, screenshots, commits, or build packages.
