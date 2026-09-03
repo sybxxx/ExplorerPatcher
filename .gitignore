@@ -1,5 +1,8 @@
 ep_private.h
 .idea/
+.playwright-cli/
+.workflow/
+output/playwright/
 ep_taskbar*/
 b*.bat
 c*.bat
