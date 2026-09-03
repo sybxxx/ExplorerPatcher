@@ -60,14 +60,16 @@ for (const text of [
   'overflow-y: auto',
   'scrollbar-gutter: stable',
   'QWeather Icons',
+  'const NATIVE_VIEWPORT_HEIGHT = 367',
   'ep_weather_updated',
-  'function contentHeight',
   'function imageHex',
   'ep_pending',
   'ep_error'
 ]) {
   if (!html.includes(text)) throw new Error(`Missing required provider behavior: ${text}`);
 }
+assert.ok(!html.includes('function contentHeight'), 'The provider must not report dynamic content height.');
+assert.match(html, /#\$\{NATIVE_VIEWPORT_HEIGHT\}#/);
 for (const forbidden of ['www.google.com/search', '<iframe', 'X-QW-Api-Key', './assets/qweather-icons', "addEventListener('wheel'"]) {
   if (html.includes(forbidden)) throw new Error(`Forbidden provider content: ${forbidden}`);
 }
@@ -190,6 +192,12 @@ assert.match(
   /BOOL bIsEmbeddedNavigation[\s\S]*?_wcsnicmp\(wszUri, L"data:text\/html", 14\)[\s\S]*?InterlockedCompareExchange64\(&_this->bAllowEmbeddedNavigation, FALSE, TRUE\)/
 );
 assert.match(hostSource, /!bIsEmbeddedNavigation && _wcsicmp\(wszUri, L"about:blank"\)/);
+assert.match(
+  hostSource,
+  /int ch = MulDiv\(MulDiv\(MulDiv\(EP_WEATHER_HEIGHT, dpi, 96\), dwTextScaleFactor, 100\), dwZoomFactor, 100\);/
+);
+assert.ok(!hostSource.includes('int ch = MulDiv(h, EP_WEATHER_HEIGHT, 367);'), 'The native host must not resize from reported content height.');
+assert.ok(hostSource.includes('_ep_Weather_ReboundBrowser(_this, bIsErrorPage);'), 'Fixed viewport changes must rebound WebView2 bounds.');
 for (const text of [
   'add_WebResourceRequested',
   'SetHeader(headers, L"X-QW-Api-Key", apiKey)',

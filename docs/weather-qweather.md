@@ -47,10 +47,11 @@ icon codes map directly to official glyphs; Open-Meteo fallback conditions map
 to the closest QWeather weather glyph.
 
 The same official filled glyph is rendered to an off-screen canvas for the
-native taskbar bitmap. The popup itself uses a single vertically scrollable
-container capped by the existing host height policy. The 24-hour strip can be
-dragged or scrolled horizontally, but it never intercepts the normal vertical
-mouse wheel used to move through the popup.
+native taskbar bitmap. The native popup keeps a fixed viewport, while the
+single `#weather` container scrolls vertically for content beyond that viewport.
+The page no longer reports its document height to resize the native window. The
+24-hour strip can be dragged or scrolled horizontally, but it never intercepts
+the normal vertical mouse wheel used to move through the popup.
 
 ## Source and verification
 

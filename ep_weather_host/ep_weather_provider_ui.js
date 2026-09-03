@@ -768,12 +768,8 @@ function imageHex(width, height) {
   return result;
 }
 
-function contentHeight() {
-  const availableHeight = Number(window.screen && window.screen.availHeight) || 900;
-  const maximumHeight = Math.max(480, Math.min(820, availableHeight - 80));
-  const height = Math.min(elements.weather.scrollHeight, maximumHeight);
-  return Math.max(367, Math.ceil(height * 367 / 353));
-}
+// Keep the private response field stable; the native host owns the viewport size.
+const NATIVE_VIEWPORT_HEIGHT = 367;
 
 function safeField(value) {
   return textValue(value).replace(/[#"]/g, ' ');
@@ -802,7 +798,7 @@ window.epWeatherGetData = function(location, language, unit, width, height, apiH
   const current = currentSource();
   if (state.status !== 'ready' || !current) return 'ep_error';
   const item = current.item;
-  return `${document.documentElement.getAttribute('dir') || 'ltr'}#${contentHeight()}#${Math.round(displayTemperatureValue(item.temp))}#${tempUnit()}#${safeField(weatherText(item, current.provider))}#${safeField(state.place && state.place.name || state.location)}#${imageHex(width, height)}`;
+  return `${document.documentElement.getAttribute('dir') || 'ltr'}#${NATIVE_VIEWPORT_HEIGHT}#${Math.round(displayTemperatureValue(item.temp))}#${tempUnit()}#${safeField(weatherText(item, current.provider))}#${safeField(state.place && state.place.name || state.location)}#${imageHex(width, height)}`;
 };
 
 if (window.__epWeatherTestMode) {
@@ -821,8 +817,7 @@ if (window.__epWeatherTestMode) {
     weatherIconCode,
     weatherIconGlyph,
     weatherIconFontReady: () => weatherIconFontLoaded,
-    renderWeather,
-    contentHeight
+    renderWeather
   });
 }
 
