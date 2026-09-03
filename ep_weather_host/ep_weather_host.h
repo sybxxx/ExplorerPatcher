@@ -71,6 +71,7 @@ typedef interface EPWeather
     LONG64 cby; // interlocked
     LONG64 dwProvider; // interlocked
     LONG64 bIsNavigatingToError; // interlocked
+    LONG64 bAllowEmbeddedNavigation; // interlocked
     LONG64 g_darkModeEnabled; // interlocked
     LONG64 dwGeolocationMode;
     LONG64 dwWindowCornerPreference;

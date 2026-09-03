@@ -10,6 +10,8 @@ Only HTTPS hosts ending in `.qweatherapi.com` are accepted. The native weather h
 
 The provider document is loaded with `NavigateToString`, which has an opaque local origin in WebView2. The weather host therefore enables the WebView2 cross-origin compatibility flags required for its HTTPS JSON requests. The QWeather request filter is installed only when both QWeather credentials are present; the Open-Meteo fallback does not install that filter. The host still blocks in-panel navigation to unapproved external pages, and API authentication remains native and host-scoped.
 
+WebView2 exposes a document loaded with `NavigateToString` as a `data:text/html` navigation. The native host marks only the next such navigation that it initiated as internal, so the embedded document can load while page-initiated navigation to an unapproved address remains blocked.
+
 The API Key is protected with Windows DPAPI for the current user and stored as `REG_BINARY` in `HKCU\Software\ExplorerPatcher\WeatherQWeatherApiKeyProtected`. ExplorerPatcher's settings export deliberately excludes both the API Host and protected key. Removing the configuration deletes both values.
 
 ## Data and refresh policy

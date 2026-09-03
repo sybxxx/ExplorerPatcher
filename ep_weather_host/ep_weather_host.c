@@ -22,6 +22,26 @@ static void epw_Weather_ScheduleBrowserRetry(EPWeather* _this);
 static BOOL epw_Weather_IsCurrentBrowserCallback(GenericObjectWithThis* _this);
 static BOOL epw_Weather_GetWebViewMemory(SIZE_T* privateBytes, SIZE_T* workingSetBytes, DWORD* processCount);
 static void epw_Weather_RequestBrowserRestart(EPWeather* _this);
+static HRESULT epw_Weather_NavigateToString(EPWeather* _this, LPCWSTR htmlContent);
+
+static HRESULT epw_Weather_NavigateToString(EPWeather* _this, LPCWSTR htmlContent)
+{
+    if (!_this || !_this->pCoreWebView2 || !htmlContent)
+    {
+        return E_INVALIDARG;
+    }
+
+    InterlockedExchange64(&_this->bAllowEmbeddedNavigation, TRUE);
+    HRESULT hr = _this->pCoreWebView2->lpVtbl->NavigateToString(
+        _this->pCoreWebView2,
+        htmlContent
+    );
+    if (FAILED(hr))
+    {
+        InterlockedExchange64(&_this->bAllowEmbeddedNavigation, FALSE);
+    }
+    return hr;
+}
 
 HRESULT STDMETHODCALLTYPE epw_Weather_static_Stub(void* _this)
 {
@@ -215,6 +235,8 @@ static void epw_Weather_ReleaseBrowser(EPWeather* _this, BOOL releaseEnvironment
     {
         return;
     }
+
+    InterlockedExchange64(&_this->bAllowEmbeddedNavigation, FALSE);
 
     if (_this->hWnd)
     {
@@ -796,7 +818,7 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_NavigateToError(EPWeather* _this)
         {
             BOOL bIsOnErrorPage = !_wcsicmp(wszPageTitle, _T(CLSID_EPWeather_TEXT) L"_ErrorPage");
             CoTaskMemFree(wszPageTitle);
-            if (!bIsOnErrorPage) return _this->pCoreWebView2->lpVtbl->NavigateToString(_this->pCoreWebView2, ep_weather_error_html);
+            if (!bIsOnErrorPage) return epw_Weather_NavigateToString(_this, ep_weather_error_html);
             else
             {
                 printf("[Browser] Already on the error page.\n");
@@ -821,10 +843,7 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_NavigateToProvider(EPWeather* _this)
         _this->cntDataFetchAttempts = 0;
         if (_this->pCoreWebView2)
         {
-            hr = _this->pCoreWebView2->lpVtbl->NavigateToString(
-                _this->pCoreWebView2,
-                ep_weather_provider_open_meteo_html
-            );
+            hr = epw_Weather_NavigateToString(_this, ep_weather_provider_open_meteo_html);
         }
         else
         {
@@ -1239,12 +1258,15 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_NavigationStarting(GenericObjectWithThis
     pCoreWebView2NavigationStartingEventArgs->lpVtbl->get_Uri(pCoreWebView2NavigationStartingEventArgs, &wszUri);
     if (wszUri)
     {
+        BOOL bIsEmbeddedNavigation =
+            !_wcsnicmp(wszUri, L"data:text/html", 14) &&
+            InterlockedCompareExchange64(&_this->bAllowEmbeddedNavigation, FALSE, TRUE) == TRUE;
         if (!_wcsicmp(wszUri, L"epweather://refresh"))
         {
             pCoreWebView2NavigationStartingEventArgs->lpVtbl->put_Cancel(pCoreWebView2NavigationStartingEventArgs, TRUE);
             PostMessageW(_this->hWnd, EP_WEATHER_WM_FETCH_DATA, 0, 0);
         }
-        else if (_wcsicmp(wszUri, L"about:blank"))
+        else if (!bIsEmbeddedNavigation && _wcsicmp(wszUri, L"about:blank"))
         {
             static const LPCWSTR allowedExternalUrls[] = {
                 L"https://www.qweather.com/",

@@ -151,6 +151,15 @@ assert.strictEqual(normalizers.validQWeatherHost('qweatherapi.com.evil.example')
 assert.strictEqual(normalizers.validQWeatherHost('https://abc123.qweatherapi.com'), false);
 
 const hostSource = fs.readFileSync(hostPath, 'utf8');
+assert.match(
+  hostSource,
+  /InterlockedExchange64\(&_this->bAllowEmbeddedNavigation, TRUE\)[\s\S]*?NavigateToString/
+);
+assert.match(
+  hostSource,
+  /BOOL bIsEmbeddedNavigation[\s\S]*?_wcsnicmp\(wszUri, L"data:text\/html", 14\)[\s\S]*?InterlockedCompareExchange64\(&_this->bAllowEmbeddedNavigation, FALSE, TRUE\)/
+);
+assert.match(hostSource, /!bIsEmbeddedNavigation && _wcsicmp\(wszUri, L"about:blank"\)/);
 for (const text of [
   'add_WebResourceRequested',
   'SetHeader(headers, L"X-QW-Api-Key", apiKey)',
@@ -158,7 +167,11 @@ for (const text of [
   'EP_WEATHER_WM_CAPTURE_DATA',
   'add_WebMessageReceived',
   '--disable-site-isolation-trials --disable-web-security --allow-insecure-localhost',
-  'qweatherConfigured = EPQWeather_IsConfigured'
+  'qweatherConfigured = EPQWeather_IsConfigured',
+  'epw_Weather_NavigateToString',
+  'bAllowEmbeddedNavigation',
+  'data:text/html',
+  'InterlockedCompareExchange64'
 ]) {
   if (!hostSource.includes(text)) throw new Error(`Missing native host protection: ${text}`);
 }
