@@ -394,6 +394,12 @@
 ;%R:1504%
 ;%R:1505%
 "WeatherLocation"=""
+;t %QWEATHERSTATUSTEXT%
+;u %R:1562%
+;qweather_configure
+;u %R:1563%
+;qweather_clear
+;q
 ;c 5 %R:1506%
 ;x 0 %R:1507%
 ;x 3 %R:1508%

@@ -292,6 +292,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\ExplorerPatcher\weather_qweather_config.c" />
     <ClCompile Include="ep_weather.c" />
     <ClCompile Include="ep_weather_factory.c" />
     <ClCompile Include="ep_weather_host.c" />
@@ -299,6 +300,7 @@
   <ItemGroup>
     <ClInclude Include="..\ep_weather_host_stub\$(Platform)\$(Configuration)\ep_weather_host_h.h" />
     <ClInclude Include="..\ExplorerPatcher\def.h" />
+    <ClInclude Include="..\ExplorerPatcher\weather_qweather_config.h" />
     <ClInclude Include="ep_weather.h" />
     <ClInclude Include="ep_weather_error_html.h" />
     <ClInclude Include="ep_weather_factory.h" />

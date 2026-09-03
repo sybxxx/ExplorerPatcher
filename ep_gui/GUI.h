@@ -16,6 +16,7 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #pragma comment(lib, "Shcore.lib")
 #include <conio.h>
 #include <stdio.h>
+#include <wctype.h>
 #include <Uxtheme.h>
 #pragma comment(lib, "UxTheme.lib")
 #include <dwmapi.h>
@@ -25,6 +26,7 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #include "../ExplorerPatcher/fmemopen.h"
 #include "../ExplorerPatcher/Localization.h"
 #include "../ExplorerPatcher/utility.h"
+#include "../ExplorerPatcher/weather_qweather_config.h"
 #include "ep_weather.h"
 #include "ep_weather_host_h.h"
 

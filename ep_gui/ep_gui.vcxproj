@@ -123,9 +123,11 @@
     <ClCompile Include="..\ExplorerPatcher\getline.c" />
     <ClCompile Include="..\ExplorerPatcher\Localization.cpp" />
     <ClCompile Include="..\ExplorerPatcher\utility.c" />
+    <ClCompile Include="..\ExplorerPatcher\weather_qweather_config.c" />
     <ClCompile Include="..\ep_weather_host_stub\$(Platform)\$(Configuration)\ep_weather_host_i.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\ExplorerPatcher\weather_qweather_config.h" />
     <ClInclude Include="GUI.h" />
     <!--<ClInclude Include="GUI2.h" />-->
     <ClInclude Include="pch.h" />

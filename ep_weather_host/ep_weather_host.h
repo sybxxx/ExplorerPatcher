@@ -4,6 +4,7 @@
 #include "ep_weather_utility.h"
 #include "ep_weather_host_h.h"
 #include "../ExplorerPatcher/def.h"
+#include "../ExplorerPatcher/weather_qweather_config.h"
 #include <windowsx.h>
 #include <ShlObj.h>
 #include <Shobjidl.h>
@@ -59,6 +60,7 @@ typedef interface EPWeather
     INT64 bBrowserBusy; // interlocked
     INT64 bBrowserRestarting; // interlocked
     INT64 bBrowserRestartPending; // interlocked
+    INT64 bDataCapturePending; // interlocked
     LONG64 dwBrowserGeneration; // interlocked
     DWORD dwBrowserRestartFailures;
     HWND hNotifyWnd; // interlocked
@@ -107,6 +109,10 @@ typedef interface EPWeather
     EventRegistrationToken tkOnNavigationCompleted;
     /*//*/GenericObjectWithThis* pCoreWebView2PermissionRequestedEventHandler;//
     EventRegistrationToken tkOnPermissionRequested;
+    /*//*/GenericObjectWithThis* pCoreWebView2WebResourceRequestedEventHandler;//
+    EventRegistrationToken tkOnWebResourceRequested;
+    /*//*/GenericObjectWithThis* pCoreWebView2WebMessageReceivedEventHandler;//
+    EventRegistrationToken tkOnWebMessageReceived;
     RECT rc;
     LONG64 dpiXInitial;
     LONG64 dpiYInitial;
@@ -300,6 +306,28 @@ static const ICoreWebView2PermissionRequestedEventHandlerVtbl EPWeather_ICoreWeb
     .AddRef = GenericObjectWithThis_AddRef,
     .Release = GenericObjectWithThis_Release,
     .Invoke = ICoreWebView2_PermissionRequested,
+};
+
+
+/* ICoreWebView2WebResourceRequestedEventHandler */
+HRESULT STDMETHODCALLTYPE ICoreWebView2WebResourceRequestedEventHandler_QueryInterface(GenericObjectWithThis* _this, REFIID riid, void** ppv);
+HRESULT STDMETHODCALLTYPE ICoreWebView2_WebResourceRequested(GenericObjectWithThis* _this, ICoreWebView2* sender, ICoreWebView2WebResourceRequestedEventArgs* args);
+static const ICoreWebView2WebResourceRequestedEventHandlerVtbl EPWeather_ICoreWebView2WebResourceRequestedEventHandlerVtbl = {
+    .QueryInterface = ICoreWebView2WebResourceRequestedEventHandler_QueryInterface,
+    .AddRef = GenericObjectWithThis_AddRef,
+    .Release = GenericObjectWithThis_Release,
+    .Invoke = ICoreWebView2_WebResourceRequested,
+};
+
+
+/* ICoreWebView2WebMessageReceivedEventHandler */
+HRESULT STDMETHODCALLTYPE ICoreWebView2WebMessageReceivedEventHandler_QueryInterface(GenericObjectWithThis* _this, REFIID riid, void** ppv);
+HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(GenericObjectWithThis* _this, ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args);
+static const ICoreWebView2WebMessageReceivedEventHandlerVtbl EPWeather_ICoreWebView2WebMessageReceivedEventHandlerVtbl = {
+    .QueryInterface = ICoreWebView2WebMessageReceivedEventHandler_QueryInterface,
+    .AddRef = GenericObjectWithThis_AddRef,
+    .Release = GenericObjectWithThis_Release,
+    .Invoke = ICoreWebView2_WebMessageReceived,
 };
 
 

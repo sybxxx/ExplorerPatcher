@@ -1085,7 +1085,14 @@ HRESULT InputBox(BOOL bPassword, HWND hWnd, LPCWSTR wszPrompt, LPCWSTR wszTitle,
 
                             if (result.bstrVal)
                             {
-                                memcpy(wszAnswer, result.bstrVal, cbAnswer * sizeof(WCHAR));
+                                UINT sourceLength = SysStringLen(result.bstrVal);
+                                DWORD copyLength = min(sourceLength, cbAnswer - 1);
+                                memcpy(wszAnswer, result.bstrVal, copyLength * sizeof(WCHAR));
+                                wszAnswer[copyLength] = 0;
+                                if (bPassword)
+                                {
+                                    SecureZeroMemory(result.bstrVal, SysStringByteLen(result.bstrVal));
+                                }
                             }
                             else
                             {

@@ -1,0 +1,55 @@
+# QWeather weather provider
+
+ExplorerPatcher keeps the weather popup as a local, embedded WebView2 document. When a QWeather API Host and API Key are configured, the local document requests QWeather JSON APIs and renders the result. It does not embed or copy the QWeather or China Weather websites.
+
+## Configuration and credentials
+
+Open **ExplorerPatcher Properties > Weather** and choose **Configure QWeather API**. Enter the account-specific API Host shown in the QWeather console, followed by the API Key.
+
+Only HTTPS hosts ending in `.qweatherapi.com` are accepted. The native weather host injects `X-QW-Api-Key` only into `GET` requests whose host exactly matches the validated configured host. The key is never passed to JavaScript or placed in a URL.
+
+The API Key is protected with Windows DPAPI for the current user and stored as `REG_BINARY` in `HKCU\Software\ExplorerPatcher\WeatherQWeatherApiKeyProtected`. ExplorerPatcher's settings export deliberately excludes both the API Host and protected key. Removing the configuration deletes both values.
+
+## Data and refresh policy
+
+The provider uses these endpoints:
+
+| Dataset | Endpoint | Refresh interval |
+| --- | --- | ---: |
+| Location | `/geo/v2/city/lookup` | Once per page lifecycle |
+| Current conditions | `/weather/v1/current/{lat}/{lon}` | 10 minutes |
+| 24 hourly forecasts | `/weather/v1/hourly/{lat}/{lon}` | 60 minutes |
+| 5 daily forecasts | `/weather/v1/daily/{lat}/{lon}` | 3 hours |
+| 2-hour minutely precipitation | `/v7/minutely/5m` | 5 minutes |
+| Official alerts | `/weatheralert/v1/current/{lat}/{lon}` | 5 minutes |
+| Air quality | `/airquality/v1/current/{lat}/{lon}` | 60 minutes |
+
+Requests have a seven-second timeout and at most one retry for timeouts, HTTP 408, and server errors. HTTP 401 and 403 stop QWeather retries for the current page lifecycle. HTTP 429 applies a bounded backoff of at least 15 minutes and honors a longer `Retry-After` response.
+
+Each dataset refreshes independently. A failure in alerts or air quality does not discard valid current or hourly weather. Old request generations cannot overwrite data after the location, language, units, or API Host change.
+
+## Fallback and attribution
+
+Without valid QWeather credentials, or when the first QWeather current-conditions request cannot complete, the widget keeps its lightweight Open-Meteo fallback. Esri and Photon remain fallback geocoders. The popup labels fallback mode instead of presenting Open-Meteo data as QWeather data.
+
+QWeather mode displays the required QWeather attribution, uses the official `metadata.attributions` link when supplied, and preserves source names returned in each API response's `refer.sources` field. The local page creates source links without loading remote pages inside the weather WebView.
+
+## Source and verification
+
+The maintainable provider sources are:
+
+- `ep_weather_host/ep_weather_provider_shell.html`
+- `ep_weather_host/ep_weather_provider_data.js`
+- `ep_weather_host/ep_weather_provider_ui.js`
+
+Run the following after editing them:
+
+```powershell
+node ep_weather_host\generate_weather_provider_header.js
+node ep_weather_host\verify_open_meteo_provider.js
+pwsh -File ep_weather_host\verify_qweather_config.ps1
+```
+
+The generated `ep_weather_provider_open_meteo_html.h` remains the C build input for compatibility with the existing weather provider. The verifiers check source/header synchronization, JavaScript syntax, required endpoints and lifecycle limits, current QWeather response normalization, native header injection, strict API Host matching, and DPAPI storage.
+
+Real API acceptance still requires an account-specific API Host and API Key. Never add either value to test fixtures, logs, screenshots, commits, or build packages.

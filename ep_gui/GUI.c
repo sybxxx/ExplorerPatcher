@@ -13,6 +13,164 @@ BOOL g_darkModeEnabled = FALSE;
 DWORD dwTaskbarPosition = 3;
 DWORD GUI_TaskbarStyle = -1;
 
+static void GUI_ReloadWeatherProvider(HWND hwnd)
+{
+    HWND weatherWindow = FindWindowW(_T(EPW_WEATHER_CLASSNAME), NULL);
+    if (weatherWindow)
+    {
+        PostMessageW(weatherWindow, EP_WEATHER_WM_FETCH_DATA, 0, 0);
+    }
+    InvalidateRect(hwnd, NULL, FALSE);
+}
+
+static void GUI_ShowLocalizedWeatherMessage(HWND hwnd, UINT stringId, UINT flags)
+{
+    WCHAR message[1024] = { 0 };
+    LoadStringW(hModule, stringId, message, ARRAYSIZE(message));
+    MessageBoxW(hwnd, message, _T(PRODUCT_NAME), flags);
+}
+
+static void GUI_TrimSecret(WCHAR* value)
+{
+    if (!value) return;
+    WCHAR* start = value;
+    while (*start && iswspace(*start)) ++start;
+    size_t length = wcslen(start);
+    while (length && iswspace(start[length - 1])) --length;
+    if (start != value) memmove(value, start, length * sizeof(WCHAR));
+    value[length] = 0;
+}
+
+static HRESULT GUI_ConfigureQWeather(HWND hwnd)
+{
+    WCHAR previousHost[EP_QWEATHER_MAX_HOST] = { 0 };
+    WCHAR keyProbe[EP_QWEATHER_MAX_API_KEY] = { 0 };
+    BOOL hadHost = SUCCEEDED(EPQWeather_ReadApiHost(previousHost, ARRAYSIZE(previousHost))) && previousHost[0];
+    BOOL hadKey = SUCCEEDED(EPQWeather_ReadApiKey(keyProbe, ARRAYSIZE(keyProbe))) && keyProbe[0];
+    SecureZeroMemory(keyProbe, sizeof(keyProbe));
+
+    WCHAR title[256] = { 0 };
+    WCHAR prompt[1024] = { 0 };
+    WCHAR hostInput[EP_QWEATHER_MAX_HOST] = { 0 };
+    BOOL cancelled = FALSE;
+    LoadStringW(hModule, IDS_WEATHER_QWEATHER_HOST_TITLE, title, ARRAYSIZE(title));
+    LoadStringW(hModule, IDS_WEATHER_QWEATHER_HOST_PROMPT, prompt, ARRAYSIZE(prompt));
+    HRESULT hr = InputBox(
+        FALSE,
+        hwnd,
+        prompt,
+        title,
+        hadHost ? previousHost : L"",
+        hostInput,
+        ARRAYSIZE(hostInput),
+        &cancelled
+    );
+    if (FAILED(hr) || cancelled)
+    {
+        return cancelled ? S_FALSE : hr;
+    }
+
+    WCHAR normalizedHost[EP_QWEATHER_MAX_HOST] = { 0 };
+    hr = EPQWeather_NormalizeApiHost(hostInput, normalizedHost, ARRAYSIZE(normalizedHost));
+    if (FAILED(hr))
+    {
+        GUI_ShowLocalizedWeatherMessage(hwnd, IDS_WEATHER_QWEATHER_INVALID_HOST, MB_ICONERROR);
+        SecureZeroMemory(hostInput, sizeof(hostInput));
+        return hr;
+    }
+
+    WCHAR keyInput[EP_QWEATHER_MAX_API_KEY] = { 0 };
+    ZeroMemory(title, sizeof(title));
+    ZeroMemory(prompt, sizeof(prompt));
+    LoadStringW(hModule, IDS_WEATHER_QWEATHER_KEY_TITLE, title, ARRAYSIZE(title));
+    LoadStringW(
+        hModule,
+        hadKey ? IDS_WEATHER_QWEATHER_KEY_PROMPT_KEEP : IDS_WEATHER_QWEATHER_KEY_PROMPT_NEW,
+        prompt,
+        ARRAYSIZE(prompt)
+    );
+    cancelled = FALSE;
+    hr = InputBox(
+        TRUE,
+        hwnd,
+        prompt,
+        title,
+        L"",
+        keyInput,
+        ARRAYSIZE(keyInput),
+        &cancelled
+    );
+    if (FAILED(hr) || cancelled)
+    {
+        SecureZeroMemory(keyInput, sizeof(keyInput));
+        SecureZeroMemory(hostInput, sizeof(hostInput));
+        return cancelled ? S_FALSE : hr;
+    }
+    GUI_TrimSecret(keyInput);
+    if (!keyInput[0] && !hadKey)
+    {
+        GUI_ShowLocalizedWeatherMessage(hwnd, IDS_WEATHER_QWEATHER_KEY_REQUIRED, MB_ICONERROR);
+        SecureZeroMemory(keyInput, sizeof(keyInput));
+        SecureZeroMemory(hostInput, sizeof(hostInput));
+        return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+    }
+
+    WCHAR previousKey[EP_QWEATHER_MAX_API_KEY] = { 0 };
+    BOOL keyWasStored = FALSE;
+    if (keyInput[0])
+    {
+        if (hadKey && FAILED(EPQWeather_ReadApiKey(previousKey, ARRAYSIZE(previousKey))))
+        {
+            hr = HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+        }
+        else
+        {
+            hr = EPQWeather_StoreApiKey(keyInput);
+            keyWasStored = SUCCEEDED(hr);
+        }
+    }
+    if (SUCCEEDED(hr)) hr = EPQWeather_StoreApiHost(normalizedHost);
+    if (FAILED(hr))
+    {
+        if (keyWasStored)
+        {
+            EPQWeather_ClearConfig();
+            if (hadKey) EPQWeather_StoreApiKey(previousKey);
+            if (hadHost) EPQWeather_StoreApiHost(previousHost);
+        }
+        GUI_ShowLocalizedWeatherMessage(hwnd, IDS_WEATHER_QWEATHER_SAVE_FAILED, MB_ICONERROR);
+    }
+    else
+    {
+        GUI_ShowLocalizedWeatherMessage(hwnd, IDS_WEATHER_QWEATHER_SAVED, MB_ICONINFORMATION);
+        GUI_ReloadWeatherProvider(hwnd);
+    }
+
+    SecureZeroMemory(previousKey, sizeof(previousKey));
+    SecureZeroMemory(keyInput, sizeof(keyInput));
+    SecureZeroMemory(hostInput, sizeof(hostInput));
+    SecureZeroMemory(normalizedHost, sizeof(normalizedHost));
+    return hr;
+}
+
+static HRESULT GUI_ClearQWeather(HWND hwnd)
+{
+    WCHAR prompt[512] = { 0 };
+    LoadStringW(hModule, IDS_WEATHER_QWEATHER_CLEAR_PROMPT, prompt, ARRAYSIZE(prompt));
+    if (MessageBoxW(hwnd, prompt, _T(PRODUCT_NAME), MB_ICONQUESTION | MB_YESNO) != IDYES)
+    {
+        return S_FALSE;
+    }
+    HRESULT hr = EPQWeather_ClearConfig();
+    GUI_ShowLocalizedWeatherMessage(
+        hwnd,
+        SUCCEEDED(hr) ? IDS_WEATHER_QWEATHER_CLEARED : IDS_WEATHER_QWEATHER_CLEAR_FAILED,
+        SUCCEEDED(hr) ? MB_ICONINFORMATION : MB_ICONERROR
+    );
+    if (SUCCEEDED(hr)) GUI_ReloadWeatherProvider(hwnd);
+    return hr;
+}
+
 LSTATUS SetPolicy(HKEY hKey, LPCWSTR wszPolicyPath, LPCWSTR wszPolicyName, DWORD dwVal)
 {
     WCHAR wszPath[MAX_PATH];
@@ -1377,6 +1535,26 @@ static BOOL GUI_Build(HDC hDC, HWND hwnd, POINT pt)
                         }
                         if (!bOk) continue;
                     }
+                    else if (!wcsncmp(text, L"%QWEATHERSTATUSTEXT%", 20))
+                    {
+                        WCHAR apiHost[EP_QWEATHER_MAX_HOST] = { 0 };
+                        if (EPQWeather_IsConfigured(apiHost, ARRAYSIZE(apiHost)))
+                        {
+                            WCHAR format[MAX_PATH] = { 0 };
+                            LoadStringW(hModule, IDS_WEATHER_QWEATHER_STATUS_CONFIGURED, format, ARRAYSIZE(format));
+                            swprintf_s(text, MAX_LINE_LENGTH, format, apiHost);
+                        }
+                        else
+                        {
+                            LoadStringW(
+                                hModule,
+                                IDS_WEATHER_QWEATHER_STATUS_NOT_CONFIGURED,
+                                text,
+                                MAX_LINE_LENGTH
+                            );
+                        }
+                        SecureZeroMemory(apiHost, sizeof(apiHost));
+                    }
                     else if (!wcsncmp(text, L"%SPOTLIGHTINFOTIP1%", 18))
                     {
                         DWORD dwDataSize = MAX_LINE_LENGTH;
@@ -2232,6 +2410,14 @@ static BOOL GUI_Build(HDC hDC, HWND hwnd, POINT pt)
                             else if (!strncmp(line + 1, "update_weather", 14))
                             {
                                 PostMessageW(FindWindowW(_T(EPW_WEATHER_CLASSNAME), NULL), EP_WEATHER_WM_FETCH_DATA, 0, 0);
+                            }
+                            else if (!strncmp(line + 1, "qweather_configure", 18))
+                            {
+                                GUI_ConfigureQWeather(hwnd);
+                            }
+                            else if (!strncmp(line + 1, "qweather_clear", 14))
+                            {
+                                GUI_ClearQWeather(hwnd);
                             }
                             else if (!strncmp(line + 1, "clear_data_weather", 18))
                             {

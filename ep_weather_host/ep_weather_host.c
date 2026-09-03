@@ -253,6 +253,22 @@ static void epw_Weather_ReleaseBrowser(EPWeather* _this, BOOL releaseEnvironment
             );
             _this->tkOnPermissionRequested.value = 0;
         }
+        if (_this->tkOnWebResourceRequested.value)
+        {
+            _this->pCoreWebView2->lpVtbl->remove_WebResourceRequested(
+                _this->pCoreWebView2,
+                _this->tkOnWebResourceRequested
+            );
+            _this->tkOnWebResourceRequested.value = 0;
+        }
+        if (_this->tkOnWebMessageReceived.value)
+        {
+            _this->pCoreWebView2->lpVtbl->remove_WebMessageReceived(
+                _this->pCoreWebView2,
+                _this->tkOnWebMessageReceived
+            );
+            _this->tkOnWebMessageReceived.value = 0;
+        }
     }
 
     if (_this->pCoreWebView2NavigationStartingEventHandler)
@@ -276,6 +292,21 @@ static void epw_Weather_ReleaseBrowser(EPWeather* _this, BOOL releaseEnvironment
         );
         _this->pCoreWebView2PermissionRequestedEventHandler = NULL;
     }
+    if (_this->pCoreWebView2WebResourceRequestedEventHandler)
+    {
+        _this->pCoreWebView2WebResourceRequestedEventHandler->lpVtbl->Release(
+            _this->pCoreWebView2WebResourceRequestedEventHandler
+        );
+        _this->pCoreWebView2WebResourceRequestedEventHandler = NULL;
+    }
+    if (_this->pCoreWebView2WebMessageReceivedEventHandler)
+    {
+        _this->pCoreWebView2WebMessageReceivedEventHandler->lpVtbl->Release(
+            _this->pCoreWebView2WebMessageReceivedEventHandler
+        );
+        _this->pCoreWebView2WebMessageReceivedEventHandler = NULL;
+    }
+    InterlockedExchange64(&_this->bDataCapturePending, FALSE);
 
     if (_this->pCoreWebView2Controller)
     {
@@ -615,6 +646,32 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2PermissionRequestedEventHandler_QueryInte
     return(NOERROR);
 }
 
+HRESULT STDMETHODCALLTYPE ICoreWebView2WebResourceRequestedEventHandler_QueryInterface(GenericObjectWithThis* _this, REFIID riid, void** ppv)
+{
+    if (!IsEqualIID(riid, &IID_ICoreWebView2WebResourceRequestedEventHandler) &&
+        !IsEqualIID(riid, &IID_IUnknown))
+    {
+        *ppv = 0;
+        return E_NOINTERFACE;
+    }
+    *ppv = _this;
+    _this->lpVtbl->AddRef(_this);
+    return NOERROR;
+}
+
+HRESULT STDMETHODCALLTYPE ICoreWebView2WebMessageReceivedEventHandler_QueryInterface(GenericObjectWithThis* _this, REFIID riid, void** ppv)
+{
+    if (!IsEqualIID(riid, &IID_ICoreWebView2WebMessageReceivedEventHandler) &&
+        !IsEqualIID(riid, &IID_IUnknown))
+    {
+        *ppv = 0;
+        return E_NOINTERFACE;
+    }
+    *ppv = _this;
+    _this->lpVtbl->AddRef(_this);
+    return NOERROR;
+}
+
 HRESULT STDMETHODCALLTYPE ICoreWebView2CallDevToolsProtocolMethodCompletedHandler_QueryInterface(GenericObjectWithThis* _this, REFIID riid, void** ppv)
 {
     if (!IsEqualIID(riid, &IID_ICoreWebView2CallDevToolsProtocolMethodCompletedHandler) &&
@@ -644,10 +701,10 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2ExecuteScriptCompletedHandler_QueryInterf
 
 HRESULT STDMETHODCALLTYPE ICoreWebView2_get_AdditionalBrowserArguments(ICoreWebView2EnvironmentOptions* _this, LPWSTR* value)
 {
-    *value = CoTaskMemAlloc(82 * sizeof(WCHAR));
+    *value = CoTaskMemAlloc(sizeof(WCHAR));
     if (*value)
     {
-        wcscpy_s(*value, 82, L"--disable-site-isolation-trials --disable-web-security --allow-insecure-localhost");
+        (*value)[0] = 0;
     }
     return S_OK;
 }
@@ -794,8 +851,11 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_ExecuteDataScript(EPWeather* _this)
         {
             WCHAR wszEscapedTerm[MAX_PATH * 12];
             WCHAR wszEscapedLanguage[MAX_PATH * 12];
+            WCHAR wszApiHost[EP_QWEATHER_MAX_HOST] = { 0 };
+            WCHAR wszEscapedApiHost[EP_QWEATHER_MAX_HOST * 3] = { 0 };
             DWORD cchEscapedTerm = ARRAYSIZE(wszEscapedTerm);
             DWORD cchEscapedLanguage = ARRAYSIZE(wszEscapedLanguage);
+            DWORD cchEscapedApiHost = ARRAYSIZE(wszEscapedApiHost);
             HRESULT escapeHr = UrlEscapeW(
                 _this->wszTerm,
                 wszEscapedTerm,
@@ -813,6 +873,16 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_ExecuteDataScript(EPWeather* _this)
             }
             if (SUCCEEDED(escapeHr))
             {
+                EPQWeather_IsConfigured(wszApiHost, ARRAYSIZE(wszApiHost));
+                escapeHr = UrlEscapeW(
+                    wszApiHost,
+                    wszEscapedApiHost,
+                    &cchEscapedApiHost,
+                    URL_ESCAPE_URI_COMPONENT
+                );
+            }
+            if (SUCCEEDED(escapeHr))
+            {
                 swprintf_s(
                     wszScriptData,
                     EP_WEATHER_PROVIDER_OPEN_METEO_SCRIPT_LEN,
@@ -821,7 +891,8 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_ExecuteDataScript(EPWeather* _this)
                     wszEscapedLanguage,
                     (int)InterlockedAdd64(&_this->dwTemperatureUnit, 0),
                     (int)InterlockedAdd64(&_this->cbx, 0),
-                    (int)InterlockedAdd64(&_this->cby, 0)
+                    (int)InterlockedAdd64(&_this->cby, 0),
+                    wszEscapedApiHost
                 );
             }
             else
@@ -829,6 +900,7 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_ExecuteDataScript(EPWeather* _this)
                 wszScriptData[0] = 0;
                 hr = escapeHr;
             }
+            SecureZeroMemory(wszApiHost, sizeof(wszApiHost));
             if (_this->pCoreWebView2)
             {
                 GenericObjectWithThis* pCoreWebView2ExecuteScriptCompletedHandler =
@@ -946,6 +1018,7 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_CreateCoreWebView2ControllerCompleted(Ge
     _this->pCoreWebView2->lpVtbl->get_Settings(_this->pCoreWebView2, &pCoreWebView2Settings);
     if (pCoreWebView2Settings)
     {
+        pCoreWebView2Settings->lpVtbl->put_IsWebMessageEnabled(pCoreWebView2Settings, TRUE);
         ICoreWebView2Settings6* pCoreWebView2Settings6 = NULL;
         pCoreWebView2Settings->lpVtbl->QueryInterface(pCoreWebView2Settings, &IID_ICoreWebView2Settings6, &pCoreWebView2Settings6);
         if (pCoreWebView2Settings6)
@@ -984,6 +1057,53 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_CreateCoreWebView2ControllerCompleted(Ge
     if (_this->pCoreWebView2PermissionRequestedEventHandler)
         _this->pCoreWebView2->lpVtbl->add_PermissionRequested(_this->pCoreWebView2, _this->pCoreWebView2PermissionRequestedEventHandler, &_this->tkOnPermissionRequested);
 
+    HRESULT fetchFilterHr = _this->pCoreWebView2->lpVtbl->AddWebResourceRequestedFilter(
+        _this->pCoreWebView2,
+        L"https://*/*",
+        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH
+    );
+    HRESULT xhrFilterHr = _this->pCoreWebView2->lpVtbl->AddWebResourceRequestedFilter(
+        _this->pCoreWebView2,
+        L"https://*/*",
+        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST
+    );
+    if (SUCCEEDED(fetchFilterHr) || SUCCEEDED(xhrFilterHr))
+    {
+        _this->pCoreWebView2WebResourceRequestedEventHandler =
+            GenericObjectWithThis_MakeAndInitialize(
+                &EPWeather_ICoreWebView2WebResourceRequestedEventHandlerVtbl,
+                _this,
+                L"pCoreWebView2WebResourceRequestedEventHandler"
+            );
+        if (_this->pCoreWebView2WebResourceRequestedEventHandler)
+        {
+            _this->pCoreWebView2->lpVtbl->add_WebResourceRequested(
+                _this->pCoreWebView2,
+                _this->pCoreWebView2WebResourceRequestedEventHandler,
+                &_this->tkOnWebResourceRequested
+            );
+        }
+    }
+    else
+    {
+        printf("[QWeather] Web request filtering is unavailable; authenticated requests will use the fallback provider.\n");
+    }
+
+    _this->pCoreWebView2WebMessageReceivedEventHandler =
+        GenericObjectWithThis_MakeAndInitialize(
+            &EPWeather_ICoreWebView2WebMessageReceivedEventHandlerVtbl,
+            _this,
+            L"pCoreWebView2WebMessageReceivedEventHandler"
+        );
+    if (_this->pCoreWebView2WebMessageReceivedEventHandler)
+    {
+        _this->pCoreWebView2->lpVtbl->add_WebMessageReceived(
+            _this->pCoreWebView2,
+            _this->pCoreWebView2WebMessageReceivedEventHandler,
+            &_this->tkOnWebMessageReceived
+        );
+    }
+
     _this->pCoreWebView2Controller->lpVtbl->put_IsVisible(
         _this->pCoreWebView2Controller,
         IsWindowVisible(_this->hWnd)
@@ -1021,6 +1141,77 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_CallDevToolsProtocolMethodCompleted(Gene
     return S_OK;
 }
 
+HRESULT STDMETHODCALLTYPE ICoreWebView2_WebResourceRequested(
+    GenericObjectWithThis* _this2,
+    ICoreWebView2* sender,
+    ICoreWebView2WebResourceRequestedEventArgs* args
+)
+{
+    EPWeather* _this = _this2 ? _this2->_this : NULL;
+    if (!_this || !args || !epw_Weather_IsCurrentBrowserCallback(_this2) ||
+        sender != _this->pCoreWebView2)
+    {
+        return S_OK;
+    }
+
+    ICoreWebView2WebResourceRequest* request = NULL;
+    LPWSTR uri = NULL;
+    LPWSTR method = NULL;
+    ICoreWebView2HttpRequestHeaders* headers = NULL;
+    WCHAR apiHost[EP_QWEATHER_MAX_HOST] = { 0 };
+    WCHAR apiKey[EP_QWEATHER_MAX_API_KEY] = { 0 };
+
+    if (SUCCEEDED(args->lpVtbl->get_Request(args, &request)) && request &&
+        SUCCEEDED(request->lpVtbl->get_Uri(request, &uri)) && uri &&
+        SUCCEEDED(request->lpVtbl->get_Method(request, &method)) && method &&
+        !_wcsicmp(method, L"GET") &&
+        SUCCEEDED(EPQWeather_ReadApiHost(apiHost, ARRAYSIZE(apiHost))) && apiHost[0] &&
+        EPQWeather_IsRequestUriForHost(uri, apiHost) &&
+        SUCCEEDED(EPQWeather_ReadApiKey(apiKey, ARRAYSIZE(apiKey))) && apiKey[0] &&
+        SUCCEEDED(request->lpVtbl->get_Headers(request, &headers)) && headers)
+    {
+        HRESULT headerHr = headers->lpVtbl->SetHeader(headers, L"X-QW-Api-Key", apiKey);
+        if (FAILED(headerHr))
+        {
+            printf("[QWeather] Failed to attach the API authentication header: 0x%08x.\n", (unsigned int)headerHr);
+        }
+    }
+
+    SecureZeroMemory(apiKey, sizeof(apiKey));
+    SecureZeroMemory(apiHost, sizeof(apiHost));
+    if (headers) headers->lpVtbl->Release(headers);
+    if (method) CoTaskMemFree(method);
+    if (uri) CoTaskMemFree(uri);
+    if (request) request->lpVtbl->Release(request);
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
+    GenericObjectWithThis* _this2,
+    ICoreWebView2* sender,
+    ICoreWebView2WebMessageReceivedEventArgs* args
+)
+{
+    EPWeather* _this = _this2 ? _this2->_this : NULL;
+    if (!_this || !args || !epw_Weather_IsCurrentBrowserCallback(_this2) ||
+        sender != _this->pCoreWebView2)
+    {
+        return S_OK;
+    }
+
+    LPWSTR message = NULL;
+    if (SUCCEEDED(args->lpVtbl->TryGetWebMessageAsString(args, &message)) && message)
+    {
+        if (!_wcsicmp(message, L"ep_weather_updated") &&
+            InterlockedCompareExchange64(&_this->bDataCapturePending, TRUE, FALSE) == FALSE)
+        {
+            PostMessageW(_this->hWnd, EP_WEATHER_WM_CAPTURE_DATA, 0, 0);
+        }
+        CoTaskMemFree(message);
+    }
+    return S_OK;
+}
+
 HRESULT STDMETHODCALLTYPE ICoreWebView2_NavigationStarting(GenericObjectWithThis* _this2, ICoreWebView2* pCoreWebView2, ICoreWebView2NavigationStartingEventArgs* pCoreWebView2NavigationStartingEventArgs)
 {
     EPWeather* _this = _this2 ? _this2->_this : NULL; // GetWindowLongPtrW(FindWindowW(_T(EPW_WEATHER_CLASSNAME), NULL), GWLP_USERDATA);
@@ -1038,6 +1229,29 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_NavigationStarting(GenericObjectWithThis
         {
             pCoreWebView2NavigationStartingEventArgs->lpVtbl->put_Cancel(pCoreWebView2NavigationStartingEventArgs, TRUE);
             PostMessageW(_this->hWnd, EP_WEATHER_WM_FETCH_DATA, 0, 0);
+        }
+        else if (_wcsicmp(wszUri, L"about:blank"))
+        {
+            static const LPCWSTR allowedExternalUrls[] = {
+                L"https://www.qweather.com/",
+                L"https://developer.qweather.com/",
+                L"https://open-meteo.com/",
+                L"https://www.esri.com/",
+                L"https://photon.komoot.io/"
+            };
+            pCoreWebView2NavigationStartingEventArgs->lpVtbl->put_Cancel(
+                pCoreWebView2NavigationStartingEventArgs,
+                TRUE
+            );
+            for (DWORD index = 0; index < ARRAYSIZE(allowedExternalUrls); ++index)
+            {
+                size_t prefixLength = wcslen(allowedExternalUrls[index]);
+                if (!_wcsnicmp(wszUri, allowedExternalUrls[index], prefixLength))
+                {
+                    ShellExecuteW(NULL, L"open", wszUri, NULL, NULL, SW_SHOWNORMAL);
+                    break;
+                }
+            }
         }
         CoTaskMemFree(wszUri);
     }
@@ -1482,6 +1696,16 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
         }
         return 0;
     }
+    else if (uMsg == EP_WEATHER_WM_CAPTURE_DATA)
+    {
+        InterlockedExchange64(&_this->bDataCapturePending, FALSE);
+        if (_this->pCoreWebView2 &&
+            !InterlockedAdd64(&_this->bIsNavigatingToError, 0))
+        {
+            _epw_Weather_ExecuteDataScript(_this);
+        }
+        return 0;
+    }
     else if (uMsg == WM_TIMER && wParam == EP_WEATHER_TIMER_REQUEST_REPAINT)
     {
         HWND hNotifyWnd = InterlockedAdd64(&_this->hNotifyWnd, 0);
@@ -1502,7 +1726,15 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
     }
     else if (uMsg == WM_TIMER && wParam == EP_WEATHER_TIMER_SCHEDULE_REFRESH)
     {
-        if (SendMessageW(_this->hWnd, EP_WEATHER_WM_FETCH_DATA, 0, 0))
+        WCHAR apiHost[EP_QWEATHER_MAX_HOST] = { 0 };
+        if (EPQWeather_IsConfigured(apiHost, ARRAYSIZE(apiHost)))
+        {
+            _epw_Weather_ExecuteDataScript(_this);
+            KillTimer(_this->hWnd, EP_WEATHER_TIMER_SCHEDULE_REFRESH);
+            LONG64 dwUpdateSchedule = InterlockedAdd64(&_this->dwUpdateSchedule, 0);
+            SetTimer(_this->hWnd, EP_WEATHER_TIMER_SCHEDULE_REFRESH, dwUpdateSchedule, NULL);
+        }
+        else if (SendMessageW(_this->hWnd, EP_WEATHER_WM_FETCH_DATA, 0, 0))
         {
             printf("[Timer Scheduled Refresh] Browser is busy, waiting a minute and retrying...\n");
             KillTimer(_this->hWnd, EP_WEATHER_TIMER_SCHEDULE_REFRESH);
@@ -1515,6 +1747,7 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
             printf("[Timer Scheduled Refresh] Fetching data, sleeping for %lld more ms.\n", dwUpdateSchedule);
             SetTimer(_this->hWnd, EP_WEATHER_TIMER_SCHEDULE_REFRESH, dwUpdateSchedule, NULL);
         }
+        SecureZeroMemory(apiHost, sizeof(apiHost));
         return 0;
     }
     else if (uMsg == WM_TIMER && wParam == EP_WEATHER_TIMER_RESIZE_WINDOW)
