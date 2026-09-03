@@ -1058,37 +1058,50 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_CreateCoreWebView2ControllerCompleted(Ge
     if (_this->pCoreWebView2PermissionRequestedEventHandler)
         _this->pCoreWebView2->lpVtbl->add_PermissionRequested(_this->pCoreWebView2, _this->pCoreWebView2PermissionRequestedEventHandler, &_this->tkOnPermissionRequested);
 
-    HRESULT fetchFilterHr = _this->pCoreWebView2->lpVtbl->AddWebResourceRequestedFilter(
-        _this->pCoreWebView2,
-        L"https://*/*",
-        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH
+    WCHAR qweatherHost[EP_QWEATHER_MAX_HOST] = { 0 };
+    BOOL qweatherConfigured = EPQWeather_IsConfigured(
+        qweatherHost,
+        ARRAYSIZE(qweatherHost)
     );
-    HRESULT xhrFilterHr = _this->pCoreWebView2->lpVtbl->AddWebResourceRequestedFilter(
-        _this->pCoreWebView2,
-        L"https://*/*",
-        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST
-    );
-    if (SUCCEEDED(fetchFilterHr) || SUCCEEDED(xhrFilterHr))
+    if (qweatherConfigured)
     {
-        _this->pCoreWebView2WebResourceRequestedEventHandler =
-            GenericObjectWithThis_MakeAndInitialize(
-                &EPWeather_ICoreWebView2WebResourceRequestedEventHandlerVtbl,
-                _this,
-                L"pCoreWebView2WebResourceRequestedEventHandler"
-            );
-        if (_this->pCoreWebView2WebResourceRequestedEventHandler)
+        HRESULT fetchFilterHr = _this->pCoreWebView2->lpVtbl->AddWebResourceRequestedFilter(
+            _this->pCoreWebView2,
+            L"https://*/*",
+            COREWEBVIEW2_WEB_RESOURCE_CONTEXT_FETCH
+        );
+        HRESULT xhrFilterHr = _this->pCoreWebView2->lpVtbl->AddWebResourceRequestedFilter(
+            _this->pCoreWebView2,
+            L"https://*/*",
+            COREWEBVIEW2_WEB_RESOURCE_CONTEXT_XML_HTTP_REQUEST
+        );
+        if (SUCCEEDED(fetchFilterHr) || SUCCEEDED(xhrFilterHr))
         {
-            _this->pCoreWebView2->lpVtbl->add_WebResourceRequested(
-                _this->pCoreWebView2,
-                _this->pCoreWebView2WebResourceRequestedEventHandler,
-                &_this->tkOnWebResourceRequested
-            );
+            _this->pCoreWebView2WebResourceRequestedEventHandler =
+                GenericObjectWithThis_MakeAndInitialize(
+                    &EPWeather_ICoreWebView2WebResourceRequestedEventHandlerVtbl,
+                    _this,
+                    L"pCoreWebView2WebResourceRequestedEventHandler"
+                );
+            if (_this->pCoreWebView2WebResourceRequestedEventHandler)
+            {
+                _this->pCoreWebView2->lpVtbl->add_WebResourceRequested(
+                    _this->pCoreWebView2,
+                    _this->pCoreWebView2WebResourceRequestedEventHandler,
+                    &_this->tkOnWebResourceRequested
+                );
+            }
+        }
+        else
+        {
+            printf("[QWeather] Web request filtering is unavailable; authenticated requests will use the fallback provider.\n");
         }
     }
     else
     {
-        printf("[QWeather] Web request filtering is unavailable; authenticated requests will use the fallback provider.\n");
+        printf("[QWeather] Credentials are not configured; WebView2 request filtering is disabled.\n");
     }
+    SecureZeroMemory(qweatherHost, sizeof(qweatherHost));
 
     _this->pCoreWebView2WebMessageReceivedEventHandler =
         GenericObjectWithThis_MakeAndInitialize(

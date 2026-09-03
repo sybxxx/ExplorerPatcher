@@ -18,7 +18,7 @@ static void GUI_ReloadWeatherProvider(HWND hwnd)
     HWND weatherWindow = FindWindowW(_T(EPW_WEATHER_CLASSNAME), NULL);
     if (weatherWindow)
     {
-        PostMessageW(weatherWindow, EP_WEATHER_WM_FETCH_DATA, 0, 0);
+        PostMessageW(weatherWindow, EP_WEATHER_WM_RESTART_BROWSER, 0, 0);
     }
     InvalidateRect(hwnd, NULL, FALSE);
 }

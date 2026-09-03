@@ -157,7 +157,8 @@ for (const text of [
   'EPQWeather_IsRequestUriForHost',
   'EP_WEATHER_WM_CAPTURE_DATA',
   'add_WebMessageReceived',
-  '--disable-site-isolation-trials --disable-web-security --allow-insecure-localhost'
+  '--disable-site-isolation-trials --disable-web-security --allow-insecure-localhost',
+  'qweatherConfigured = EPQWeather_IsConfigured'
 ]) {
   if (!hostSource.includes(text)) throw new Error(`Missing native host protection: ${text}`);
 }
