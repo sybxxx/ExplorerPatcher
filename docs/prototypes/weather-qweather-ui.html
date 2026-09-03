@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>ExplorerPatcher 和风天气 UI 样板</title>
+<style>
+@font-face {
+  font-family: "QWeather Icons";
+  src: url("./assets/qweather-icons.woff2") format("woff2");
+  font-display: block;
+}
+
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0;
+  --page: #dce2e8;
+  --panel: #f8fafc;
+  --surface: #ffffff;
+  --surface-alt: #eef2f5;
+  --text: #202124;
+  --muted: #68717d;
+  --line: #d4dae1;
+  --blue: #176ca8;
+  --blue-soft: #e7f2fa;
+  --weather-icon: #647f99;
+  --green: #23834a;
+  --green-soft: #e9f5ec;
+  --orange: #c14b17;
+  --alert: #3479b8;
+  --shadow: 0 18px 48px rgba(33, 43, 54, .2), 0 2px 8px rgba(33, 43, 54, .12);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #171a1f;
+  --panel: #20242a;
+  --surface: #272c33;
+  --surface-alt: #2d333b;
+  --text: #f2f4f7;
+  --muted: #aeb7c3;
+  --line: #3b424c;
+  --blue: #72b9e8;
+  --blue-soft: #253b4a;
+  --weather-icon: #a9bfd2;
+  --green: #77cb91;
+  --green-soft: #263d30;
+  --orange: #f09a6f;
+  --alert: #6caee1;
+  --shadow: 0 20px 50px rgba(0, 0, 0, .38);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #171a1f;
+    --panel: #20242a;
+    --surface: #272c33;
+    --surface-alt: #2d333b;
+    --text: #f2f4f7;
+    --muted: #aeb7c3;
+    --line: #3b424c;
+    --blue: #72b9e8;
+    --blue-soft: #253b4a;
+    --weather-icon: #a9bfd2;
+    --green: #77cb91;
+    --green-soft: #263d30;
+    --orange: #f09a6f;
+    --alert: #6caee1;
+    --shadow: 0 20px 50px rgba(0, 0, 0, .38);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { min-width: 320px; min-height: 100%; margin: 0; }
+body {
+  padding: 22px;
+  background: var(--page);
+  color: var(--text);
+}
+button, input, select, textarea { font: inherit; }
+a { color: inherit; }
+
+.weather-panel {
+  width: min(940px, 100%);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 58px;
+  padding: 13px 22px;
+}
+.location-line { display: flex; align-items: baseline; min-width: 0; gap: 8px; }
+.location-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #c9372c; }
+.location { overflow: hidden; font-size: 18px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.city { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.provider { flex: 0 0 auto; color: var(--muted); font-size: 11px; text-align: right; }
+.provider strong { color: var(--text); font-weight: 600; }
+
+.alert-strip {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-left: 5px solid var(--alert);
+  background: var(--blue-soft);
+}
+.alert-strip summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 7px 17px 7px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.alert-strip summary::-webkit-details-marker { display: none; }
+.alert-strip summary::after {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  content: "";
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 120ms ease;
+}
+.alert-strip[open] summary::after { transform: rotate(225deg) translate(-2px, -1px); }
+.alert-level { padding: 3px 6px; border-radius: 4px; background: var(--alert); color: #fff; font-size: 10px; font-weight: 700; }
+.alert-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.alert-time { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.alert-body { padding: 0 44px 12px 61px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+
+.current {
+  display: grid;
+  grid-template-columns: 112px minmax(165px, 1fr) minmax(185px, auto);
+  align-items: center;
+  gap: 18px;
+  padding: 18px 22px 14px;
+}
+.weather-glyph {
+  display: inline-grid;
+  width: 1em;
+  height: 1em;
+  place-items: center;
+  color: var(--weather-icon);
+  font-family: "QWeather Icons" !important;
+  font-style: normal;
+  font-weight: 400;
+  font-variant: normal;
+  line-height: 1;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+}
+.current-icon { width: 104px; height: 104px; font-size: 96px; }
+.qi-100::before { content: "\f101"; }
+.qi-101::before { content: "\f102"; }
+.qi-104::before { content: "\f105"; }
+.qi-150::before { content: "\f106"; }
+.qi-151::before { content: "\f107"; }
+.qi-152::before { content: "\f108"; }
+.qi-153::before { content: "\f109"; }
+.qi-305::before { content: "\f10f"; }
+.qi-306::before { content: "\f110"; }
+.qi-307::before { content: "\f111"; }
+.qi-308::before { content: "\f112"; }
+.qi-501::before { content: "\f12f"; }
+.qi-502::before { content: "\f130"; }
+.qi-999::before { content: "\f146"; }
+
+.temperature-line { display: flex; align-items: flex-start; white-space: nowrap; }
+.temperature { font-size: 62px; font-weight: 650; line-height: .95; }
+.degree { margin: 2px 0 0 3px; font-size: 25px; font-weight: 500; }
+.current-sub { margin-top: 7px; color: var(--muted); font-size: 12px; }
+.current-copy { min-width: 0; text-align: right; }
+.condition { font-size: 22px; font-weight: 650; }
+.condition-note { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.today-range { margin-top: 10px; font-size: 12px; }
+.today-range strong { font-size: 14px; }
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0 22px 17px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--line);
+  gap: 1px;
+}
+.detail { min-width: 0; padding: 8px 7px 7px; background: var(--surface); text-align: center; }
+.detail-label { display: block; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.detail-value { display: block; margin-top: 2px; overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+
+.section { padding: 16px 22px 18px; border-top: 1px solid var(--line); }
+.section-heading { display: flex; align-items: baseline; gap: 9px; margin-bottom: 11px; }
+.section-title { font-size: 14px; font-weight: 700; }
+.section-note { min-width: 0; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.rain-message { color: var(--orange); font-size: 12px; font-weight: 650; }
+.rain-chart {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  align-items: end;
+  gap: 3px;
+  height: 66px;
+  margin-top: 10px;
+  padding-top: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.rain-bar { min-height: 2px; background: var(--blue); }
+.rain-axis { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 4px; color: var(--muted); font-size: 9px; }
+.rain-axis span:nth-child(2), .rain-axis span:nth-child(3), .rain-axis span:nth-child(4) { text-align: center; }
+.rain-axis span:last-child { text-align: right; }
+
+.hourly-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.hour {
+  min-width: 0;
+  min-height: 103px;
+  padding: 8px 2px 7px;
+  border-right: 1px solid var(--line);
+  text-align: center;
+}
+.hour:nth-child(12n) { border-right: 0; }
+.hour:nth-child(n+13) { border-top: 1px solid var(--line); }
+.hour-time, .hour-text, .hour-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hour-time { font-size: 10px; }
+.hour .weather-glyph { margin: 3px auto 1px; font-size: 28px; }
+.hour-text { font-size: 10px; font-weight: 600; }
+.hour-meta { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.hour-pop { color: var(--blue); font-weight: 700; }
+
+.air-layout { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 18px; }
+.aqi-main { padding-right: 18px; border-right: 1px solid var(--line); text-align: center; }
+.aqi-value { color: var(--green); font-size: 38px; font-weight: 720; line-height: 1; }
+.aqi-label { margin-top: 3px; font-size: 11px; font-weight: 650; }
+.pollutants { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.pollutant { min-width: 0; text-align: center; }
+.pollutant-name { display: block; color: var(--muted); font-size: 9px; white-space: nowrap; }
+.pollutant-value { display: block; margin-top: 3px; overflow: hidden; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.air-advice { margin-top: 10px; padding: 7px 10px; border-left: 3px solid var(--green); background: var(--green-soft); color: var(--muted); font-size: 10px; }
+
+.daily-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.day { min-width: 0; padding: 4px 9px 7px; border-right: 1px solid var(--line); text-align: center; }
+.day:last-child { border-right: 0; }
+.day-name { font-size: 11px; font-weight: 650; }
+.day-date { margin-top: 1px; color: var(--muted); font-size: 9px; }
+.day .weather-glyph { margin: 5px auto 2px; font-size: 38px; }
+.day-text { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.day-temp { margin-top: 3px; font-size: 11px; font-weight: 650; }
+.day-pop { margin-top: 2px; color: var(--blue); font-size: 10px; font-weight: 700; }
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 9px 22px 11px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+}
+.footer a { text-underline-offset: 2px; }
+
+@media (max-width: 720px) {
+  body { padding: 0; }
+  .weather-panel { border-width: 0; border-radius: 0; box-shadow: none; }
+  .current { grid-template-columns: 92px minmax(125px, 1fr) minmax(120px, auto); gap: 10px; }
+  .current-icon { width: 86px; height: 86px; font-size: 80px; }
+  .temperature { font-size: 52px; }
+  .details { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .detail:nth-child(4), .detail:nth-child(5) { grid-column: span 1; }
+  .hourly-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .hour:nth-child(6n) { border-right: 0; }
+  .hour:nth-child(12n) { border-right: 0; }
+  .hour:nth-child(n+7) { border-top: 1px solid var(--line); }
+  .pollutants { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; }
+}
+
+@media (max-width: 470px) {
+  .topbar { align-items: flex-start; padding-right: 15px; padding-left: 15px; }
+  .location-line { flex-wrap: wrap; gap: 4px 7px; }
+  .provider { max-width: 118px; }
+  .alert-strip summary { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .alert-time { display: none; }
+  .alert-body { padding-left: 15px; }
+  .current { grid-template-columns: 82px minmax(0, 1fr); padding-right: 15px; padding-left: 15px; }
+  .current-icon { width: 76px; height: 76px; font-size: 70px; }
+  .current-copy { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; text-align: left; }
+  .condition { font-size: 18px; }
+  .today-range { margin-top: 0; }
+  .details { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-right: 15px; margin-left: 15px; }
+  .detail:last-child { grid-column: 1 / -1; }
+  .section { padding-right: 15px; padding-left: 15px; }
+  .hourly-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .hour:nth-child(4n) { border-right: 0; }
+  .hour:nth-child(6n):not(:nth-child(4n)) { border-right: 1px solid var(--line); }
+  .hour:nth-child(n+5) { border-top: 1px solid var(--line); }
+  .air-layout { grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
+  .aqi-main { padding-right: 10px; }
+  .daily-grid { grid-template-columns: repeat(5, minmax(84px, 1fr)); overflow-x: auto; }
+  .footer { justify-content: flex-start; padding-right: 15px; padding-left: 15px; }
+}
+</style>
+</head>
+<body>
+<main class="weather-panel" aria-label="蒸湘区天气">
+  <header class="topbar">
+    <div class="location-line">
+      <span class="location-dot" aria-hidden="true"></span>
+      <span class="location">蒸湘区</span>
+      <span class="city">衡阳市 · 湖南省</span>
+    </div>
+    <div class="provider"><strong>和风天气</strong><br>13:51 更新</div>
+  </header>
+
+  <details class="alert-strip">
+    <summary>
+      <span class="alert-level">蓝色</span>
+      <span class="alert-title">湖南省气象局发布暴雨蓝色预警</span>
+      <time class="alert-time">9/2 16:08</time>
+    </summary>
+    <div class="alert-body">预计未来 12 小时湘中、湘南部分地区将出现较强降雨，请注意防范短时强降水、雷暴大风及城市内涝。</div>
+  </details>
+
+  <section aria-label="当前天气">
+    <div class="current">
+      <i class="weather-glyph current-icon qi-306" role="img" aria-label="中雨"></i>
+      <div>
+        <div class="temperature-line"><span class="temperature">20</span><span class="degree">°C</span></div>
+        <div class="current-sub">体感 17°C · 湿度较高</div>
+      </div>
+      <div class="current-copy">
+        <div>
+          <div class="condition">中雨</div>
+          <div class="condition-note">降雨仍将持续约 2 小时</div>
+        </div>
+        <div class="today-range">今日 <strong>17° / 21°</strong></div>
+      </div>
+    </div>
+    <div class="details">
+      <div class="detail"><span class="detail-label">体感</span><span class="detail-value">17°C</span></div>
+      <div class="detail"><span class="detail-label">湿度</span><span class="detail-value">92%</span></div>
+      <div class="detail"><span class="detail-label">风向风速</span><span class="detail-value">西北风 29 km/h</span></div>
+      <div class="detail"><span class="detail-label">当前降水</span><span class="detail-value">1.6 mm</span></div>
+      <div class="detail"><span class="detail-label">能见度</span><span class="detail-value">23 km</span></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="minute-title">
+    <div class="section-heading">
+      <span class="section-title" id="minute-title">未来 2 小时降水</span>
+      <span class="section-note">每 5 分钟 · 13:45</span>
+    </div>
+    <div class="rain-message">10 分钟后开始下小雨，之后雨势逐渐增强</div>
+    <div class="rain-chart" id="rain-chart" aria-label="未来两小时每五分钟降水量"></div>
+    <div class="rain-axis"><span>现在</span><span>30 分钟</span><span>60 分钟</span><span>90 分钟</span><span>120 分钟</span></div>
+  </section>
+
+  <section class="section" aria-labelledby="hourly-title">
+    <div class="section-heading">
+      <span class="section-title" id="hourly-title">未来 24 小时</span>
+      <span class="section-note">逐小时天气 · 温度 · 降雨概率</span>
+    </div>
+    <div class="hourly-grid" id="hourly-grid"></div>
+  </section>
+
+  <section class="section" aria-labelledby="air-title">
+    <div class="section-heading">
+      <span class="section-title" id="air-title">空气质量</span>
+      <span class="section-note">中国环境监测标准</span>
+    </div>
+    <div class="air-layout">
+      <div class="aqi-main">
+        <div class="aqi-value">30</div>
+        <div class="aqi-label">优 · 等级 1</div>
+      </div>
+      <div class="pollutants">
+        <div class="pollutant"><span class="pollutant-name">PM2.5</span><span class="pollutant-value">9</span></div>
+        <div class="pollutant"><span class="pollutant-name">PM10</span><span class="pollutant-value">13</span></div>
+        <div class="pollutant"><span class="pollutant-name">NO₂</span><span class="pollutant-value">7</span></div>
+        <div class="pollutant"><span class="pollutant-name">O₃</span><span class="pollutant-value">95</span></div>
+        <div class="pollutant"><span class="pollutant-name">SO₂</span><span class="pollutant-value">5</span></div>
+        <div class="pollutant"><span class="pollutant-name">CO</span><span class="pollutant-value">0.7</span></div>
+      </div>
+    </div>
+    <div class="air-advice">空气质量令人满意，各类人群可正常活动。</div>
+  </section>
+
+  <section class="section" aria-labelledby="daily-title">
+    <div class="section-heading">
+      <span class="section-title" id="daily-title">未来 5 天</span>
+      <span class="section-note">最高 / 最低温度</span>
+    </div>
+    <div class="daily-grid" id="daily-grid"></div>
+  </section>
+
+  <footer class="footer">
+    <span>天气数据及图标由</span>
+    <a href="https://www.qweather.com/" target="_blank" rel="noreferrer">和风天气</a>
+    <span>提供</span>
+  </footer>
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  const queryTheme = new URLSearchParams(window.location.search).get('theme');
+  if (queryTheme === 'light' || queryTheme === 'dark') {
+    document.documentElement.dataset.theme = queryTheme;
+  }
+
+  const rain = [0, 0, .10, .10, .11, .11, .12, .13, .13, .11, .13, .15, .15, .15, .15, .11, .09, .11, .09, .09, .14, .16, .17, .19];
+  const rainChart = document.getElementById('rain-chart');
+  const rainMax = Math.max(...rain);
+  rain.forEach(function(value, index) {
+    const bar = document.createElement('span');
+    bar.className = 'rain-bar';
+    bar.style.height = Math.max(2, Math.round(value / rainMax * 58)) + 'px';
+    bar.title = (index * 5) + ' 分钟：' + value.toFixed(2) + ' mm';
+    rainChart.appendChild(bar);
+  });
+
+  const hours = [
+    ['14:00', '306', '中雨', 19, 88], ['15:00', '306', '中雨', 19, 87],
+    ['16:00', '305', '小雨', 19, 83], ['17:00', '306', '中雨', 19, 84],
+    ['18:00', '305', '小雨', 20, 82], ['19:00', '501', '雾', 20, 84],
+    ['20:00', '104', '阴', 21, 0], ['21:00', '151', '多云', 21, 0],
+    ['22:00', '151', '多云', 20, 0], ['23:00', '151', '多云', 20, 0],
+    ['00:00', '151', '多云', 20, 0], ['01:00', '151', '多云', 20, 76],
+    ['02:00', '151', '多云', 20, 74], ['03:00', '305', '小雨', 20, 65],
+    ['04:00', '305', '小雨', 20, 68], ['05:00', '501', '雾', 20, 75],
+    ['06:00', '104', '阴', 21, 78], ['07:00', '104', '阴', 21, 0],
+    ['08:00', '104', '阴', 21, 81], ['09:00', '101', '多云', 22, 82],
+    ['10:00', '305', '小雨', 22, 78], ['11:00', '305', '小雨', 23, 73],
+    ['12:00', '501', '雾', 23, 70], ['13:00', '501', '雾', 23, 72]
+  ];
+  const hourlyGrid = document.getElementById('hourly-grid');
+  hours.forEach(function(hour) {
+    const item = document.createElement('div');
+    item.className = 'hour';
+    item.innerHTML = '<div class="hour-time">' + hour[0] + '</div>' +
+      '<i class="weather-glyph qi-' + hour[1] + '" role="img" aria-label="' + hour[2] + '"></i>' +
+      '<div class="hour-text">' + hour[2] + '</div>' +
+      '<div class="hour-meta">' + hour[3] + '°C · <span class="hour-pop">' + hour[4] + '%</span></div>';
+    hourlyGrid.appendChild(item);
+  });
+
+  const days = [
+    ['今天', '9月2日', '306', '中雨', '21° / 17°', 88],
+    ['明天', '9月3日', '305', '小雨', '23° / 18°', 72],
+    ['周五', '9月4日', '101', '多云', '26° / 19°', 30],
+    ['周六', '9月5日', '100', '晴', '29° / 21°', 10],
+    ['周日', '9月6日', '104', '阴', '27° / 20°', 45]
+  ];
+  const dailyGrid = document.getElementById('daily-grid');
+  days.forEach(function(day) {
+    const item = document.createElement('div');
+    item.className = 'day';
+    item.innerHTML = '<div class="day-name">' + day[0] + '</div>' +
+      '<div class="day-date">' + day[1] + '</div>' +
+      '<i class="weather-glyph qi-' + day[2] + '" role="img" aria-label="' + day[3] + '"></i>' +
+      '<div class="day-text">' + day[3] + '</div>' +
+      '<div class="day-temp">' + day[4] + '</div>' +
+      '<div class="day-pop">降雨 ' + day[5] + '%</div>';
+    dailyGrid.appendChild(item);
+  });
+})();
+</script>
+</body>
+</html>
