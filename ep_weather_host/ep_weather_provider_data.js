@@ -35,6 +35,7 @@ const state = {
   qBackoffUntil: 0,
   refreshTimer: null,
   notifyTimer: null,
+  alertOpenStates: new Map(),
   iconWidth: 32,
   iconHeight: 32
 };
@@ -407,7 +408,8 @@ function recordQWeatherFailure(name, error) {
 async function fetchQDataset(name, force, generation) {
   const now = Date.now();
   if (generation !== state.generation || state.qAuthFailed || state.inFlight[name]) return null;
-  if (!force && (now < (state.nextDue[name] || 0) || now < state.qBackoffUntil)) return null;
+  if (!force && now < (state.nextDue[name] || 0)) return null;
+  if (now < state.qBackoffUntil) return null;
   state.inFlight[name] = true;
   try {
     const raw = qweatherResponse(await getJson(qDatasetUrl(name)));
@@ -457,6 +459,7 @@ async function resolveQWeatherLocation(query, generation) {
     lon,
     name: textValue(row.name),
     city: textValue(pick(row, ['adm2', 'adm1'])),
+    province: textValue(pick(row, ['adm1', 'province', 'state'])),
     country: textValue(row.country),
     source: 'QWeather'
   };
@@ -477,6 +480,7 @@ async function resolveFallbackLocation(query, generation) {
         lon,
         name: textValue(pick(attributes, ['ShortLabel', 'PlaceName'])),
         city: textValue(pick(attributes, ['City', 'Subregion'])),
+        province: textValue(pick(attributes, ['Region', 'State', 'Province', 'Adm1'])),
         country: textValue(attributes.Country),
         source: 'Esri'
       };
@@ -497,6 +501,7 @@ async function resolveFallbackLocation(query, generation) {
         lon,
         name: textValue(pick(properties, ['name', 'district'])),
         city: textValue(pick(properties, ['city', 'county', 'state'])),
+        province: textValue(pick(properties, ['state', 'region'])),
         country: textValue(properties.country),
         source: 'Photon'
       };
@@ -599,7 +604,7 @@ async function refreshFallback(force, generation) {
 }
 
 async function refreshDue(force, generation = state.generation) {
-  if (generation !== state.generation || !state.coords) return;
+  if (generation !== state.generation || !state.coords) return false;
   let changed = false;
   if (state.apiHost && !state.qAuthFailed) {
     changed = await refreshQWeather(force, generation) || changed;
@@ -617,6 +622,7 @@ async function refreshDue(force, generation = state.generation) {
     if (hasCurrentData()) state.status = 'ready';
     if (changed) renderWeather();
   }
+  return changed;
 }
 
 async function initializeWeather(generation) {
@@ -653,6 +659,7 @@ function resetState() {
   state.fallbackFailureCount = 0;
   state.qAuthFailed = false;
   state.qBackoffUntil = 0;
+  state.alertOpenStates.clear();
   if (state.refreshTimer) clearInterval(state.refreshTimer);
   state.refreshTimer = setInterval(() => {
     refreshDue(false).catch(() => {});

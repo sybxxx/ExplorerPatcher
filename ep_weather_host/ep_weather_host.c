@@ -23,6 +23,24 @@ static BOOL epw_Weather_IsCurrentBrowserCallback(GenericObjectWithThis* _this);
 static BOOL epw_Weather_GetWebViewMemory(SIZE_T* privateBytes, SIZE_T* workingSetBytes, DWORD* processCount);
 static void epw_Weather_RequestBrowserRestart(EPWeather* _this);
 static HRESULT epw_Weather_NavigateToString(EPWeather* _this, LPCWSTR htmlContent);
+static void epw_Weather_ApplyNativeThemeColors(EPWeather* _this, BOOL dark);
+
+static void epw_Weather_ApplyNativeThemeColors(EPWeather* _this, BOOL dark)
+{
+    if (!_this || !_this->hWnd || !IsWindows11() || IsHighContrast())
+    {
+        return;
+    }
+
+    // The provider document and the native caption are separate surfaces. Do
+    // not leave the caption to the system/Mica default after a page toggle.
+    COLORREF caption = dark ? RGB(23, 27, 33) : RGB(251, 252, 254);
+    COLORREF text = dark ? RGB(242, 244, 247) : RGB(31, 35, 40);
+    COLORREF border = dark ? RGB(53, 62, 73) : RGB(217, 224, 231);
+    DwmSetWindowAttribute(_this->hWnd, DWMWA_CAPTION_COLOR, &caption, sizeof(caption));
+    DwmSetWindowAttribute(_this->hWnd, DWMWA_TEXT_COLOR, &text, sizeof(text));
+    DwmSetWindowAttribute(_this->hWnd, DWMWA_BORDER_COLOR, &border, sizeof(border));
+}
 
 static HRESULT epw_Weather_NavigateToString(EPWeather* _this, LPCWSTR htmlContent)
 {
@@ -1235,7 +1253,17 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
     LPWSTR message = NULL;
     if (SUCCEEDED(args->lpVtbl->TryGetWebMessageAsString(args, &message)) && message)
     {
-        if (!_wcsicmp(message, L"ep_weather_updated") &&
+        if (!_wcsicmp(message, L"ep_weather_theme_dark"))
+        {
+            // Apply the page-selected theme on the window thread so the native
+            // caption/backdrop stays in sync with the embedded document.
+            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME, TRUE, 0);
+        }
+        else if (!_wcsicmp(message, L"ep_weather_theme_light"))
+        {
+            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME, FALSE, 0);
+        }
+        else if (!_wcsicmp(message, L"ep_weather_updated") &&
             InterlockedCompareExchange64(&_this->bDataCapturePending, TRUE, FALSE) == FALSE)
         {
             PostMessageW(_this->hWnd, EP_WEATHER_WM_CAPTURE_DATA, 0, 0);
@@ -1831,6 +1859,13 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
         }
         return HRESULT_FROM_WIN32(ERROR_BUSY);
     }
+    else if (uMsg == EP_WEATHER_WM_SET_NATIVE_THEME)
+    {
+        // The page owns the visual theme, while the native window owns its
+        // non-client caption and backdrop. Keep both layers synchronized.
+        epw_Weather_SetDarkMode(_this, wParam ? 2 : 1, FALSE);
+        return 0;
+    }
     else if (uMsg == EP_WEATHER_WM_SET_BROWSER_THEME)
     {
         if (_this->pCoreWebView2)
@@ -1946,6 +1981,9 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
                 }
                 BOOL value = (IsThemeActive() && !IsHighContrast()) ? 1 : 0;
                 SetMicaMaterialForThisWindow(_this->hWnd, value);
+                LONG64 nativeDark = FALSE;
+                epw_Weather_IsDarkMode(_this, dwDarkMode, &nativeDark);
+                epw_Weather_ApplyNativeThemeColors(_this, (BOOL)nativeDark);
             }
             else
             {
@@ -2109,6 +2147,7 @@ HRESULT STDMETHODCALLTYPE epw_Weather_SetDarkMode(EPWeather* _this, LONG64 dwDar
                 s = -1;
             }
             DwmSetWindowAttribute(_this->hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE + s, &bEnabled, sizeof(BOOL));
+            epw_Weather_ApplyNativeThemeColors(_this, (BOOL)bEnabled);
             //InvalidateRect(_this->hWnd, NULL, FALSE);
             PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_BROWSER_THEME, bEnabled, bRefresh);
         }

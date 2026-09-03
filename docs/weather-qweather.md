@@ -32,6 +32,18 @@ Requests have a seven-second timeout and at most one retry for timeouts, HTTP 40
 
 Each dataset refreshes independently. A failure in alerts or air quality does not discard valid current or hourly weather. Old request generations cannot overwrite data after the location, language, units, or API Host change.
 
+The top-right controls are page-local controls. The refresh button requests the
+current six QWeather datasets in place and does not navigate or rebuild the
+WebView document. It is disabled while a refresh is running and for 15 seconds
+afterwards; the QWeather authentication guard, in-flight protection, and 429
+backoff still apply. The theme button follows the Windows/WebView color scheme
+until clicked, then switches between light and dark mode for the current weather
+host lifetime. Theme choice is not persisted as an ExplorerPatcher setting.
+When the theme button is used, the page also notifies the native weather host so
+the caption, caption text, border, and backdrop follow the selected page theme
+instead of leaving a light non-client strip above a dark document. The native
+host reapplies these colors when Windows broadcasts a color-scheme change.
+
 ## Fallback and attribution
 
 Without valid QWeather credentials, or when the first QWeather current-conditions request cannot complete, the widget keeps its lightweight Open-Meteo fallback. Esri and Photon remain fallback geocoders. The popup labels fallback mode instead of presenting Open-Meteo data as QWeather data.
@@ -53,8 +65,21 @@ The page no longer reports its document height to resize the native window. The
 24-hour strip can be dragged or scrolled horizontally, but it never intercepts
 the normal vertical mouse wheel used to move through the popup.
 
+The production layout includes a compact hero summary, temperature range,
+humidity meter, two-hour precipitation intensity chart with thresholds, hourly
+probability badges, primary-pollutant emphasis, live air-quality context, and a
+five-day temperature-range/probability list. These values come from the
+normalized provider response; the V2 prototype's sample values are not used.
+The wind metric allows the full direction and speed to wrap inside its metric
+card rather than hiding the tail behind an ellipsis.
+
 Alert cards retain each alert's expanded or collapsed state across background
-data refreshes. A refresh that finds no dataset due does not rebuild the page.
+data refreshes. A refresh that finds no dataset due does not rebuild the page,
+and a render with unchanged alert content reuses the existing alert DOM. The
+click handler records the intended state before the native `details` action
+completes, covering the short race where a background render is already queued.
+Opening or closing an alert does not request a taskbar data recapture because it
+does not change the taskbar weather summary.
 
 ## Source and verification
 

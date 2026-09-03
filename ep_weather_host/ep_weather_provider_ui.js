@@ -3,6 +3,9 @@ const elements = {
   location: document.getElementById('location'),
   resolved: document.getElementById('resolved'),
   providerState: document.getElementById('provider-state'),
+  updateStatus: document.getElementById('update-status'),
+  themeButton: document.getElementById('theme-button'),
+  refreshButton: document.getElementById('refresh-button'),
   alerts: document.getElementById('alerts'),
   currentGlyph: document.getElementById('current-glyph'),
   currentIcon: document.getElementById('current-icon'),
@@ -10,20 +13,35 @@ const elements = {
   unit: document.getElementById('unit'),
   condition: document.getElementById('condition'),
   updated: document.getElementById('updated'),
+  heroRange: document.getElementById('hero-range'),
+  heroSummary: document.getElementById('hero-summary'),
+  heroContext: document.getElementById('hero-context'),
   feels: document.getElementById('feels'),
+  feelsSub: document.getElementById('feels-sub'),
   humidity: document.getElementById('humidity'),
+  humidityMeter: document.getElementById('humidity-meter'),
+  humiditySub: document.getElementById('humidity-sub'),
   wind: document.getElementById('wind'),
+  windSub: document.getElementById('wind-sub'),
   precip: document.getElementById('precip'),
+  precipSub: document.getElementById('precip-sub'),
   visibility: document.getElementById('visibility'),
+  visibilitySub: document.getElementById('visibility-sub'),
   minuteSection: document.getElementById('minute-section'),
+  minuteLead: document.getElementById('minute-lead'),
   minuteUpdated: document.getElementById('minute-updated'),
   minuteSummary: document.getElementById('minute-summary'),
+  minuteDot: document.getElementById('minute-dot'),
+  minuteThresholdHeavy: document.getElementById('minute-threshold-heavy'),
+  minuteThresholdLight: document.getElementById('minute-threshold-light'),
   minuteChart: document.getElementById('minute-chart'),
   minuteAxis: document.getElementById('minute-axis'),
   hourly: document.getElementById('hourly'),
   hourlyNote: document.getElementById('hourly-note'),
+  hourlyLead: document.getElementById('hourly-lead'),
   airSection: document.getElementById('air-section'),
   airNote: document.getElementById('air-note'),
+  airLead: document.getElementById('air-lead'),
   aqiValue: document.getElementById('aqi-value'),
   aqiCategory: document.getElementById('aqi-category'),
   aqiScaleDot: document.getElementById('aqi-scale-dot'),
@@ -31,11 +49,20 @@ const elements = {
   airAdvice: document.getElementById('air-advice'),
   forecast: document.getElementById('forecast'),
   dailyNote: document.getElementById('daily-note'),
+  dailyLead: document.getElementById('daily-lead'),
   poweredBy: document.getElementById('powered-by'),
   sourceList: document.getElementById('source-list')
 };
 
 let renderTimer = null;
+let alertsRenderSignature = '';
+let manualRefreshInFlight = false;
+let manualRefreshCooldownUntil = 0;
+let manualRefreshCooldownTimer = null;
+let refreshNotice = '';
+let refreshNoticeUntil = 0;
+let refreshNoticeTimer = null;
+const MANUAL_REFRESH_COOLDOWN = 15 * 1000;
 
 function isChinese() {
   return /^zh/i.test(state.language || '');
@@ -45,8 +72,8 @@ function labels() {
   return isChinese() ? {
     loading: '\u52a0\u8f7d\u4e2d...',
     error: '\u65e0\u6cd5\u83b7\u53d6\u5929\u6c14',
-    feels: '\u4f53\u611f',
-    humidity: '\u6e7f\u5ea6',
+    feels: '\u4f53\u611f\u6e29\u5ea6',
+    humidity: '\u76f8\u5bf9\u6e7f\u5ea6',
     wind: '\u98ce\u5411\u98ce\u901f',
     precip: '\u5f53\u524d\u964d\u6c34',
     visibility: '\u80fd\u89c1\u5ea6',
@@ -57,6 +84,7 @@ function labels() {
     air: '\u7a7a\u6c14\u8d28\u91cf',
     daily5: '\u672a\u6765 5 \u5929',
     today: '\u4eca\u5929',
+    tomorrow: '\u660e\u5929',
     now: '\u73b0\u5728',
     unavailable: '\u6570\u636e\u6682\u4e0d\u53ef\u7528',
     fallback: 'Open-Meteo \u56de\u9000',
@@ -76,7 +104,30 @@ function labels() {
     qweather: '\u548c\u98ce\u5929\u6c14',
     primary: '\u9996\u8981\u6c61\u67d3\u7269',
     level: '\u7b49\u7ea7',
-    rain: '\u964d\u96e8'
+    rain: '\u964d\u96e8',
+    lightRain: '\u5c0f\u96e8',
+    moderateRain: '\u4e2d\u96e8',
+    hourlyHint: '\u9010\u5c0f\u65f6\u5929\u6c14 \u00b7 \u964d\u96e8\u6982\u7387',
+    dailyHint: '\u6e29\u5ea6\u8303\u56f4\u4e0e\u964d\u96e8\u6982\u7387',
+    minuteHint: '\u9010 5 \u5206\u949f\u9884\u6d4b',
+    refresh: '\u5237\u65b0\u5929\u6c14',
+    refreshing: '\u5237\u65b0\u4e2d...',
+    refreshDone: '\u5df2\u66f4\u65b0',
+    refreshDeferred: '\u8bf7\u7a0d\u540e\u91cd\u8bd5',
+    refreshFailed: '\u5237\u65b0\u5931\u8d25',
+    monitoring: '\u5b9e\u65f6\u76d1\u6d4b',
+    switchToDark: '\u5207\u6362\u5230\u6df1\u8272\u6a21\u5f0f',
+    switchToLight: '\u5207\u6362\u5230\u6d45\u8272\u6a21\u5f0f',
+    feelsClose: '\u4f53\u611f\u63a5\u8fd1',
+    feelsWarm: '\u4f53\u611f\u504f\u6696',
+    feelsCool: '\u4f53\u611f\u504f\u51c9',
+    humidityDry: '\u7a7a\u6c14\u504f\u5e72',
+    humidityComfort: '\u6e7f\u5ea6\u9002\u4e2d',
+    humidityHigh: '\u6e7f\u5ea6\u8f83\u9ad8',
+    visibilityGood: '\u89c6\u91ce\u826f\u597d',
+    visibilityFair: '\u89c6\u91ce\u4e00\u822c',
+    visibilityLow: '\u80fd\u89c1\u5ea6\u8f83\u4f4e',
+    observed: '\u5f53\u524d\u89c2\u6d4b'
   } : {
     loading: 'Loading...',
     error: 'Unable to load weather',
@@ -92,6 +143,7 @@ function labels() {
     air: 'Air quality',
     daily5: 'Next 5 days',
     today: 'Today',
+    tomorrow: 'Tomorrow',
     now: 'Now',
     unavailable: 'Data temporarily unavailable',
     fallback: 'Open-Meteo fallback',
@@ -111,7 +163,30 @@ function labels() {
     qweather: 'QWeather',
     primary: 'Primary',
     level: 'Level',
-    rain: 'Rain'
+    rain: 'Rain',
+    lightRain: 'Light rain',
+    moderateRain: 'Moderate rain',
+    hourlyHint: 'Hourly weather \u00b7 rain chance',
+    dailyHint: 'Temperature range and rain chance',
+    minuteHint: 'Every 5 minutes',
+    refresh: 'Refresh weather',
+    refreshing: 'Refreshing...',
+    refreshDone: 'Updated',
+    refreshDeferred: 'Try again later',
+    refreshFailed: 'Refresh failed',
+    monitoring: 'Live monitoring',
+    switchToDark: 'Switch to dark mode',
+    switchToLight: 'Switch to light mode',
+    feelsClose: 'Feels close to current',
+    feelsWarm: 'Feels warmer',
+    feelsCool: 'Feels cooler',
+    humidityDry: 'Air feels dry',
+    humidityComfort: 'Moderate humidity',
+    humidityHigh: 'High humidity',
+    visibilityGood: 'Good visibility',
+    visibilityFair: 'Fair visibility',
+    visibilityLow: 'Low visibility',
+    observed: 'Current observation'
   };
 }
 
@@ -126,6 +201,11 @@ function setStaticLabels() {
   document.getElementById('hourly-title').textContent = value.hourly24;
   document.getElementById('air-title').textContent = value.air;
   document.getElementById('daily-title').textContent = value.daily5;
+  elements.minuteLead.textContent = value.minuteHint;
+  elements.hourlyLead.textContent = value.hourlyHint;
+  elements.dailyLead.textContent = value.dailyHint;
+  updateThemeControl();
+  updateRefreshControl();
 }
 
 function openMeteoCondition(code) {
@@ -251,27 +331,47 @@ function setLoading() {
   elements.resolved.textContent = '';
   elements.providerState.textContent = '';
   elements.providerState.classList.remove('warning');
+  elements.updateStatus.textContent = '';
   elements.condition.textContent = value.loading;
   elements.temperature.textContent = '--';
   elements.unit.textContent = tempUnit();
   elements.updated.textContent = '';
+  elements.heroRange.textContent = '';
+  elements.heroRange.hidden = true;
+  elements.heroSummary.textContent = '';
+  elements.heroSummary.hidden = true;
+  elements.heroContext.textContent = '';
+  elements.heroContext.hidden = true;
   elements.feels.textContent = '--';
+  elements.feelsSub.textContent = '';
   elements.humidity.textContent = '--';
+  elements.humidityMeter.style.width = '0%';
+  elements.humiditySub.textContent = '';
   elements.wind.textContent = '--';
+  elements.windSub.textContent = '';
   elements.precip.textContent = '--';
+  elements.precipSub.textContent = '';
   elements.visibility.textContent = '--';
+  elements.visibilitySub.textContent = '';
   elements.alerts.hidden = true;
   elements.alerts.replaceChildren();
   elements.minuteSection.hidden = true;
+  elements.minuteDot.classList.remove('is-raining');
+  elements.minuteThresholdHeavy.textContent = '';
+  elements.minuteThresholdLight.textContent = '';
   elements.airSection.hidden = true;
+  elements.airLead.textContent = '';
   elements.aqiScaleDot.style.left = '0%';
   elements.airAdvice.textContent = '';
   elements.airAdvice.hidden = true;
   elements.hourly.replaceChildren();
+  elements.hourlyLead.textContent = value.hourlyHint;
   elements.forecast.replaceChildren();
+  alertsRenderSignature = '';
   setWeatherGlyph(elements.currentGlyph, { code: '999', isDay: 1 }, 'qweather');
   elements.currentGlyph.setAttribute('aria-label', value.loading);
   drawWeatherIcon(elements.currentIcon, { code: '999', isDay: 1 }, 'qweather');
+  updateRefreshControl();
 }
 
 function setError() {
@@ -298,6 +398,126 @@ function renderProviderState() {
     elements.providerState.classList.add('warning');
   } else {
     elements.providerState.textContent = 'Open-Meteo';
+  }
+}
+
+function effectiveTheme() {
+  const explicit = document.documentElement.getAttribute('data-theme');
+  if (explicit === 'dark' || explicit === 'light') return explicit;
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch (error) {
+    return 'light';
+  }
+}
+
+function updateThemeControl() {
+  if (!elements.themeButton) return;
+  const dark = effectiveTheme() === 'dark';
+  const value = labels();
+  const label = dark ? value.switchToLight : value.switchToDark;
+  const icon = elements.themeButton.querySelector('.control-icon');
+  if (icon) icon.textContent = dark ? '\u2600' : '\u263e';
+  elements.themeButton.dataset.themeMode = dark ? 'dark' : 'light';
+  elements.themeButton.title = label;
+  elements.themeButton.setAttribute('aria-label', label);
+  elements.themeButton.setAttribute('aria-pressed', dark ? 'true' : 'false');
+}
+
+function updateRefreshControl() {
+  if (!elements.refreshButton) return;
+  const value = labels();
+  const icon = elements.refreshButton.querySelector('.control-icon');
+  if (icon) icon.textContent = '\u21bb';
+  const remaining = Math.max(0, manualRefreshCooldownUntil - Date.now());
+  const disabled = manualRefreshInFlight || !state.coords || state.status !== 'ready' || remaining > 0;
+  elements.refreshButton.disabled = disabled;
+  elements.refreshButton.classList.toggle('is-busy', manualRefreshInFlight);
+  elements.refreshButton.setAttribute('aria-busy', manualRefreshInFlight ? 'true' : 'false');
+  const label = manualRefreshInFlight
+    ? value.refreshing
+    : remaining > 0 ? value.refreshDeferred : value.refresh;
+  elements.refreshButton.title = label;
+  elements.refreshButton.setAttribute('aria-label', label);
+  if (manualRefreshCooldownTimer) {
+    clearTimeout(manualRefreshCooldownTimer);
+    manualRefreshCooldownTimer = null;
+  }
+  if (!manualRefreshInFlight && remaining > 0) {
+    manualRefreshCooldownTimer = setTimeout(() => {
+      manualRefreshCooldownTimer = null;
+      updateRefreshControl();
+    }, remaining + 10);
+  }
+}
+
+function setRefreshNotice(message) {
+  refreshNotice = textValue(message);
+  refreshNoticeUntil = Date.now() + 1800;
+  if (refreshNoticeTimer) clearTimeout(refreshNoticeTimer);
+  refreshNoticeTimer = setTimeout(() => {
+    refreshNoticeTimer = null;
+    refreshNotice = '';
+    refreshNoticeUntil = 0;
+    renderUpdateStatus(currentSource());
+  }, 1800);
+  renderUpdateStatus(currentSource());
+}
+
+function renderUpdateStatus(current) {
+  if (!elements.updateStatus) return;
+  const value = labels();
+  if (manualRefreshInFlight) {
+    elements.updateStatus.textContent = value.refreshing;
+    return;
+  }
+  if (refreshNotice && Date.now() < refreshNoticeUntil) {
+    elements.updateStatus.textContent = refreshNotice;
+    return;
+  }
+  const item = current && current.item;
+  const updateTime = item && item.time || current && current.fetchedAt;
+  elements.updateStatus.textContent = updateTime ? value.updated + ' ' + formatTime(updateTime) : '';
+}
+
+function notifyNativeTheme(theme) {
+  try {
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage(theme === 'dark'
+        ? 'ep_weather_theme_dark'
+        : 'ep_weather_theme_light');
+    }
+  } catch (error) {
+    // Standalone previews do not provide the native WebView host.
+  }
+}
+
+function toggleTheme() {
+  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  updateThemeControl();
+  notifyNativeTheme(next);
+}
+
+async function refreshWeatherNow() {
+  const value = labels();
+  const now = Date.now();
+  if (manualRefreshInFlight || !state.coords || now < manualRefreshCooldownUntil) return false;
+  manualRefreshInFlight = true;
+  manualRefreshCooldownUntil = now + MANUAL_REFRESH_COOLDOWN;
+  updateRefreshControl();
+  renderUpdateStatus(currentSource());
+  try {
+    const changed = await refreshDue(true);
+    setRefreshNotice(changed ? value.refreshDone : value.refreshDeferred);
+    return Boolean(changed);
+  } catch (error) {
+    setRefreshNotice(value.refreshFailed);
+    return false;
+  } finally {
+    manualRefreshInFlight = false;
+    updateRefreshControl();
+    renderUpdateStatus(currentSource());
   }
 }
 
@@ -353,22 +573,48 @@ function renderAlerts() {
   const value = labels();
   const data = state.mode === 'qweather' && state.datasets.alerts && state.datasets.alerts.data;
   const alerts = data && Array.isArray(data.items) ? data.items : [];
-  const previousState = new Map();
+  const entries = alerts.map((alert, index) => ({ alert, key: alertIdentity(alert, index) }));
+  const signature = JSON.stringify([
+    state.generation,
+    state.language,
+    entries.map(({ alert, key }) => [
+      key,
+      alertColor(alert),
+      alertLevelText(alert),
+      alert.title,
+      alert.type,
+      alert.sender,
+      alert.published,
+      alert.start,
+      alert.end,
+      alert.description,
+      alert.standard,
+      alert.instruction
+    ].map((field) => textValue(field)))
+  ]);
+  if (signature === alertsRenderSignature && elements.alerts.childElementCount === entries.length) return;
+  alertsRenderSignature = signature;
+  const previousState = new Map(state.alertOpenStates);
   for (const details of elements.alerts.querySelectorAll('details.alert[data-alert-key]')) {
     previousState.set(details.dataset.alertKey, details.open);
   }
+  const activeKeys = new Set(entries.map(({ key }) => key));
+  for (const key of state.alertOpenStates.keys()) {
+    if (!activeKeys.has(key)) state.alertOpenStates.delete(key);
+  }
   elements.alerts.replaceChildren();
   elements.alerts.hidden = alerts.length === 0;
-  for (const [index, alert] of alerts.entries()) {
+  for (const { alert, key } of entries) {
     const details = document.createElement('details');
     const color = alertColor(alert);
-    const key = alertIdentity(alert, index);
+    const open = previousState.has(key)
+      ? previousState.get(key)
+      : color === '#b3261e' || color === '#c55318';
     details.className = 'alert';
     details.dataset.alertKey = key;
     details.style.setProperty('--alert-color', color);
-    details.open = previousState.has(key)
-      ? previousState.get(key)
-      : color === '#b3261e' || color === '#c55318';
+    details.open = open;
+    state.alertOpenStates.set(key, open);
     const summary = document.createElement('summary');
     const level = document.createElement('span');
     level.className = 'alert-level';
@@ -396,7 +642,13 @@ function renderAlerts() {
       alertBlock(value.instruction, alert.instruction)
     ]) if (block) body.append(block);
     details.append(summary, body);
-    details.addEventListener('toggle', notifyHost);
+    // Capture the intended state before the native details click action completes.
+    summary.addEventListener('click', () => {
+      state.alertOpenStates.set(key, !details.open);
+    });
+    details.addEventListener('toggle', () => {
+      if (elements.alerts.contains(details)) state.alertOpenStates.set(key, details.open);
+    });
     elements.alerts.append(details);
   }
 }
@@ -409,10 +661,14 @@ function renderMinuteForecast() {
     return;
   }
   elements.minuteSection.hidden = false;
+  elements.minuteLead.textContent = value.minuteHint;
   if (minute.available === false) {
     elements.minuteUpdated.textContent = '';
     elements.minuteSummary.textContent = value.unavailable;
-    elements.minuteSummary.style.color = 'var(--muted)';
+    elements.minuteSummary.classList.remove('is-raining');
+    elements.minuteDot.classList.remove('is-raining');
+    elements.minuteThresholdHeavy.textContent = '';
+    elements.minuteThresholdLight.textContent = '';
     elements.minuteChart.replaceChildren();
     elements.minuteAxis.replaceChildren();
     return;
@@ -421,15 +677,22 @@ function renderMinuteForecast() {
   const points = Array.isArray(minute.points) ? minute.points.slice(0, 24) : [];
   const raining = points.some((point) => Number(point.precip) > 0);
   elements.minuteSummary.textContent = minute.summary || (raining ? value.next2h : value.noRain);
-  elements.minuteSummary.style.color = raining ? 'var(--orange)' : 'var(--text)';
+  elements.minuteSummary.classList.toggle('is-raining', raining);
+  elements.minuteDot.classList.toggle('is-raining', raining);
+  elements.minuteThresholdHeavy.textContent = value.moderateRain + ' >= 0.15 mm';
+  elements.minuteThresholdLight.textContent = value.lightRain + ' >= 0.05 mm';
   elements.minuteChart.replaceChildren();
   const max = Math.max(0.1, ...points.map((point) => Number(point.precip) || 0));
   for (let index = 0; index < 24; ++index) {
     const point = points[index] || { precip: 0 };
     const bar = document.createElement('span');
-    bar.className = 'minute-bar';
-    bar.style.height = `${Math.max(2, Math.round((Number(point.precip) || 0) / max * 42))}px`;
-    bar.title = `${formatTime(point.time)} ${formatNumber(point.precip, ' mm', 1)}`;
+    const precipitation = Number(point.precip) || 0;
+    const intensity = precipitation >= 0.15 ? 'heavy'
+      : precipitation >= 0.05 ? 'rain' : precipitation > 0 ? 'drizzle' : 'none';
+    bar.className = 'minute-bar minute-bar-' + intensity;
+    bar.style.height = Math.max(2, Math.round(precipitation / max * 46)) + 'px';
+    bar.title = formatTime(point.time) + ' ' + formatNumber(point.precip, ' mm', 1);
+    bar.setAttribute('aria-label', bar.title);
     elements.minuteChart.append(bar);
   }
   elements.minuteAxis.replaceChildren();
@@ -457,11 +720,13 @@ function renderHourly() {
     rows = rows.slice(0, 24);
   }
   elements.hourly.replaceChildren();
+  elements.hourlyLead.textContent = value.hourlyHint;
   elements.hourlyNote.textContent = rows.length ? `${value.rainChance} | ${rows.length}h` : value.unavailable;
   for (let index = 0; index < rows.length; ++index) {
     const row = rows[index];
     const hour = document.createElement('div');
-    hour.className = 'hour';
+    hour.className = index === 0 ? 'hour current' : 'hour';
+    if (index === 0) hour.setAttribute('aria-current', 'true');
     const time = document.createElement('div');
     time.className = 'hour-time';
     time.textContent = index === 0 && source.provider === 'open-meteo' ? value.now : formatTime(row.time);
@@ -479,6 +744,9 @@ function renderHourly() {
     description.textContent = descriptionText;
     const probability = document.createElement('div');
     probability.className = 'hour-prob';
+    const probabilityValue = Number(row.pop);
+    probability.classList.toggle('hour-prob-medium', Number.isFinite(probabilityValue) && probabilityValue >= 30 && probabilityValue < 60);
+    probability.classList.toggle('hour-prob-high', Number.isFinite(probabilityValue) && probabilityValue >= 60);
     probability.textContent = row.pop === null || row.pop === undefined ? '--' : `${row.pop}%`;
     probability.title = `${value.rainChance}: ${probability.textContent}`;
     hour.append(time, icon, temperature, description, probability);
@@ -502,10 +770,12 @@ function aqiColor(aqi) {
 
 function renderAirQuality() {
   const value = labels();
-  const air = state.mode === 'qweather' && state.datasets.air && state.datasets.air.data;
+  const dataset = state.mode === 'qweather' && state.datasets.air;
+  const air = dataset && dataset.data;
   if (!air) {
     elements.airSection.hidden = state.mode !== 'qweather';
     elements.airNote.textContent = value.unavailable;
+    elements.airLead.textContent = value.unavailable;
     elements.aqiValue.textContent = '--';
     elements.aqiCategory.textContent = '';
     elements.aqiScaleDot.style.left = '0%';
@@ -516,15 +786,25 @@ function renderAirQuality() {
   }
   elements.airSection.hidden = false;
   elements.airNote.textContent = air.primary ? `${value.primary}: ${air.primary}` : '';
+  elements.airLead.textContent = value.monitoring;
   elements.aqiValue.textContent = air.aqi === null ? '--' : Math.round(air.aqi);
   elements.aqiValue.style.color = aqiColor(air.aqi);
   elements.aqiCategory.textContent = [air.category, air.level ? `${value.level} ${air.level}` : ''].filter(Boolean).join(' | ');
   const aqiPosition = air.aqi === null ? 0 : Math.max(0, Math.min(100, Number(air.aqi) / 300 * 100));
   elements.aqiScaleDot.style.left = `${aqiPosition}%`;
   elements.pollutants.replaceChildren();
+  const primary = textValue(air.primary).toLowerCase();
   for (const pollutant of (air.pollutants || []).slice(0, 6)) {
     const item = document.createElement('div');
-    item.className = 'pollutant';
+    const pollutantCode = textValue(pollutant.code).toLowerCase();
+    const pollutantName = textValue(pollutant.name).toLowerCase();
+    const isPrimary = primary && (
+      primary === pollutantCode ||
+      primary === pollutantName ||
+      primary.includes(pollutantCode) ||
+      pollutantName.includes(primary)
+    );
+    item.className = isPrimary ? 'pollutant pollutant-primary' : 'pollutant';
     const name = document.createElement('span');
     name.className = 'pollutant-name';
     name.textContent = pollutant.name || pollutant.code.toUpperCase();
@@ -546,6 +826,7 @@ function renderDaily() {
   const source = dailySource();
   const rows = Array.isArray(source.rows) ? source.rows.slice(0, 5) : [];
   elements.forecast.replaceChildren();
+  elements.dailyLead.textContent = value.dailyHint;
   elements.dailyNote.textContent = rows.length ? '' : value.unavailable;
   if (!rows.length) {
     const empty = document.createElement('div');
@@ -572,7 +853,7 @@ function renderDaily() {
     subdate.className = 'day-subdate';
     try {
       const parsedDate = new Date(`${row.date}T12:00:00`);
-      name.textContent = index === 0 ? value.today : weekdayFormatter.format(parsedDate);
+      name.textContent = index === 0 ? value.today : index === 1 ? value.tomorrow : weekdayFormatter.format(parsedDate);
       subdate.textContent = dateFormatter.format(parsedDate);
     } catch (error) {
       name.textContent = row.date;
@@ -593,7 +874,8 @@ function renderDaily() {
     const probability = document.createElement('div');
     probability.className = 'day-pop';
     probability.textContent = row.pop === null || row.pop === undefined ? `${value.rain} --` : `${value.rain} ${row.pop}%`;
-    weather.append(icon, text, probability);
+    probability.setAttribute('aria-label', probability.textContent);
+    weather.append(icon, text);
     const range = document.createElement('div');
     range.className = 'day-range';
     const low = document.createElement('span');
@@ -619,7 +901,7 @@ function renderDaily() {
     high.className = 'day-high';
     high.textContent = formatTemperatureShort(row.tempMax);
     range.append(low, track, high);
-    day.append(date, weather, range);
+    day.append(date, weather, probability, range);
     elements.forecast.append(day);
   }
 }
@@ -675,6 +957,81 @@ function renderSources() {
   elements.sourceList.textContent = sources.length ? `${value.sources}: ${sources.join(', ')}` : '';
 }
 
+function displayWindSpeed(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+  return state.unit ? Number(value) / 1.609344 : Number(value);
+}
+
+function renderHero(item) {
+  const value = labels();
+  const daily = dailySource().rows[0];
+  const dailyRange = daily && daily.tempMin !== null && daily.tempMax !== null
+    ? value.today + ' ' + formatTemperatureShort(daily.tempMin) + ' - ' + formatTemperatureShort(daily.tempMax)
+    : '';
+  elements.heroRange.textContent = dailyRange;
+  elements.heroRange.hidden = !dailyRange;
+
+  const minute = state.mode === 'qweather' && state.datasets.minutely && state.datasets.minutely.data;
+  const summary = minute && minute.available !== false ? textValue(minute.summary) : '';
+  elements.heroSummary.textContent = summary;
+  elements.heroSummary.hidden = !summary;
+
+  const context = [];
+  if (item.feels !== null && item.feels !== undefined) {
+    context.push(value.feels + ' ' + formatTemperature(item.feels));
+  }
+  if (item.humidity !== null && item.humidity !== undefined) {
+    context.push(value.humidity + ' ' + formatNumber(item.humidity, '%'));
+  }
+  const windSpeed = displayWindSpeed(item.windSpeed);
+  if (windSpeed !== null) {
+    context.push((item.windDir ? formatWindDirection(item.windDir) + ' ' : '') +
+      formatNumber(windSpeed, state.unit ? ' mph' : ' km/h'));
+  }
+  elements.heroContext.textContent = context.join(' \u00b7 ');
+  elements.heroContext.hidden = !elements.heroContext.textContent;
+}
+
+function renderMetrics(item) {
+  const value = labels();
+  elements.feels.textContent = formatTemperature(item.feels);
+  elements.humidity.textContent = formatNumber(item.humidity, '%');
+  elements.wind.textContent = (item.windDir ? formatWindDirection(item.windDir) + ' ' : '') +
+    formatNumber(displayWindSpeed(item.windSpeed), state.unit ? ' mph' : ' km/h');
+  const precipitation = item.precip === null || item.precip === undefined
+    ? null
+    : state.unit ? Number(item.precip) / 25.4 : Number(item.precip);
+  const visibility = item.visibility === null || item.visibility === undefined
+    ? null
+    : state.unit ? Number(item.visibility) / 1.609344 : Number(item.visibility);
+  elements.precip.textContent = formatNumber(precipitation, state.unit ? ' in' : ' mm', state.unit ? 2 : 1);
+  elements.visibility.textContent = formatNumber(visibility, state.unit ? ' mi' : ' km', 0);
+
+  const temp = displayTemperatureValue(item.temp);
+  const feels = displayTemperatureValue(item.feels);
+  if (temp === null || feels === null) {
+    elements.feelsSub.textContent = '';
+  } else {
+    const delta = Math.round((feels - temp) * 10) / 10;
+    elements.feelsSub.textContent = Math.abs(delta) < 1
+      ? value.feelsClose
+      : delta > 0 ? value.feelsWarm + ' +' + delta + String.fromCharCode(176)
+        : value.feelsCool + ' ' + delta + String.fromCharCode(176);
+  }
+
+  const humidity = item.humidity === null || item.humidity === undefined ? null : Number(item.humidity);
+  elements.humidityMeter.style.width = humidity === null ? '0%' : Math.max(0, Math.min(100, humidity)) + '%';
+  elements.humiditySub.textContent = humidity === null
+    ? ''
+    : humidity < 35 ? value.humidityDry : humidity >= 75 ? value.humidityHigh : value.humidityComfort;
+
+  elements.windSub.textContent = item.windDir ? value.observed + ': ' + formatWindDirection(item.windDir) : '';
+  elements.precipSub.textContent = precipitation === null ? '' : value.observed;
+  elements.visibilitySub.textContent = visibility === null
+    ? ''
+    : visibility >= 10 ? value.visibilityGood : visibility >= 5 ? value.visibilityFair : value.visibilityLow;
+}
+
 function renderWeather() {
   const current = currentSource();
   if (!current) {
@@ -686,7 +1043,7 @@ function renderWeather() {
   document.documentElement.lang = state.language || 'en';
   setStaticLabels();
   elements.location.textContent = state.place && state.place.name || state.location;
-  const resolvedParts = [state.place && state.place.city, state.place && state.place.country]
+  const resolvedParts = [state.place && state.place.city, state.place && (state.place.province || state.place.country)]
     .map((part) => textValue(part))
     .filter((part, index, array) => part && array.indexOf(part) === index && part !== elements.location.textContent);
   elements.resolved.textContent = resolvedParts.join(' \u00b7 ');
@@ -696,20 +1053,9 @@ function renderWeather() {
   elements.condition.textContent = weatherText(item, current.provider);
   const updateTime = item.time || current.fetchedAt;
   elements.updated.textContent = updateTime ? `${value.updated} ${formatTime(updateTime)}` : '';
-  elements.feels.textContent = formatTemperature(item.feels);
-  elements.humidity.textContent = formatNumber(item.humidity, '%');
-  const windSpeed = item.windSpeed === null || item.windSpeed === undefined
-    ? null
-    : state.unit ? Number(item.windSpeed) / 1.609344 : Number(item.windSpeed);
-  const precipitation = item.precip === null || item.precip === undefined
-    ? null
-    : state.unit ? Number(item.precip) / 25.4 : Number(item.precip);
-  const visibility = item.visibility === null || item.visibility === undefined
-    ? null
-    : state.unit ? Number(item.visibility) / 1.609344 : Number(item.visibility);
-  elements.wind.textContent = `${item.windDir ? `${formatWindDirection(item.windDir)} ` : ''}${formatNumber(windSpeed, state.unit ? ' mph' : ' km/h')}`;
-  elements.precip.textContent = formatNumber(precipitation, state.unit ? ' in' : ' mm', state.unit ? 2 : 1);
-  elements.visibility.textContent = formatNumber(visibility, state.unit ? ' mi' : ' km', 0);
+  renderUpdateStatus(current);
+  renderHero(item);
+  renderMetrics(item);
   setWeatherGlyph(elements.currentGlyph, item, current.provider);
   elements.currentGlyph.setAttribute('aria-label', weatherText(item, current.provider));
   drawWeatherIcon(elements.currentIcon, item, current.provider);
@@ -822,6 +1168,15 @@ window.epWeatherGetData = function(location, language, unit, width, height, apiH
   return `${document.documentElement.getAttribute('dir') || 'ltr'}#${NATIVE_VIEWPORT_HEIGHT}#${Math.round(displayTemperatureValue(item.temp))}#${tempUnit()}#${safeField(weatherText(item, current.provider))}#${safeField(state.place && state.place.name || state.location)}#${imageHex(width, height)}`;
 };
 
+window.epWeatherRefresh = refreshWeatherNow;
+
+if (elements.themeButton) elements.themeButton.addEventListener('click', toggleTheme);
+if (elements.refreshButton) {
+  elements.refreshButton.addEventListener('click', () => {
+    refreshWeatherNow().catch(() => setRefreshNotice(labels().refreshFailed));
+  });
+}
+
 if (window.__epWeatherTestMode) {
   window.__epWeatherTest = Object.freeze({
     state,
@@ -838,7 +1193,9 @@ if (window.__epWeatherTestMode) {
     weatherIconCode,
     weatherIconGlyph,
     weatherIconFontReady: () => weatherIconFontLoaded,
-    renderWeather
+    renderWeather,
+    refreshWeatherNow,
+    toggleTheme
   });
 }
 

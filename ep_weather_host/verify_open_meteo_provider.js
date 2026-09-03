@@ -57,11 +57,49 @@ for (const text of [
   'function weatherIconCode',
   'function initializeWeatherIconFont',
   'function alertIdentity',
+  'let alertsRenderSignature = \'\'',
   'const previousState = new Map',
+  'const activeKeys = new Set',
+  'alertOpenStates: new Map()',
   'details.dataset.alertKey',
+  'elements.alerts.contains(details)',
   'return results.some((result) => result.status === \'rejected\' || result.value !== null)',
   'let changed = false',
+  'window.epWeatherRefresh = refreshWeatherNow',
+  'MANUAL_REFRESH_COOLDOWN',
+  'refreshWeatherNow',
+  'theme-button',
+  'refresh-button',
+  'hero-range',
+  'hero-summary',
+  'minute-thresholds',
+  'hour-prob-medium',
+  'pollutant-primary',
+  'air-lead',
+  'monitoring',
+  'detail-wind .detail-value',
+  'state.place.province',
+  'renderHero(item)',
+  'renderMetrics(item)',
   'weather-glyph current-glyph',
+  'theme-button',
+  'refresh-button',
+  'window.epWeatherRefresh',
+  'notifyNativeTheme',
+  'ep_weather_theme_dark',
+  'ep_weather_theme_light',
+  'MANUAL_REFRESH_COOLDOWN',
+  'refreshWeatherNow',
+  'hero-range',
+  'hero-summary',
+  'detail-meter',
+  'minute-thresholds',
+  'hour-prob-medium',
+  'pollutant-primary',
+  'air-lead',
+  'detail-wind',
+  'tomorrow',
+  'state.place.province',
   'overflow-y: auto',
   'scrollbar-gutter: stable',
   'QWeather Icons',
@@ -75,6 +113,13 @@ for (const text of [
 }
 assert.ok(!html.includes('function contentHeight'), 'The provider must not report dynamic content height.');
 assert.match(html, /#\$\{NATIVE_VIEWPORT_HEIGHT\}#/);
+assert.match(html, /postMessage\(theme === 'dark'[\s\S]*?ep_weather_theme_dark/);
+assert.match(html, /summary\.addEventListener\('click', \(\) => \{[\s\S]*?state\.alertOpenStates\.set\(key, !details\.open\);[\s\S]*?\}\);/);
+assert.match(html, /details\.addEventListener\('toggle', \(\) => \{[\s\S]*?state\.alertOpenStates\.set\(key, details\.open\);[\s\S]*?\}\);/);
+assert.ok(!html.includes("details.addEventListener('toggle', notifyHost)"), 'Alert disclosure must not trigger a native taskbar recapture.');
+assert.match(html, /const changed = await refreshDue\(true\)/);
+assert.match(html, /state\.status !== 'ready'/);
+assert.match(html, /const disabled = manualRefreshInFlight \|\| !state\.coords \|\| state\.status !== 'ready' \|\| remaining > 0/);
 for (const forbidden of ['www.google.com/search', '<iframe', 'X-QW-Api-Key', './assets/qweather-icons', "addEventListener('wheel'"]) {
   if (html.includes(forbidden)) throw new Error(`Forbidden provider content: ${forbidden}`);
 }
@@ -98,6 +143,10 @@ for (const name of ['100', '100-fill', '306', '306-fill', '999']) {
 assert.ok(!Object.prototype.hasOwnProperty.call(embeddedIconMap, '1001'), 'Non-weather QWeather icon glyphs should not be embedded');
 
 const dataSource = fs.readFileSync(dataPath, 'utf8');
+assert.match(dataSource, /if \(!force && now < \(state\.nextDue\[name\] \|\| 0\)\) return null;/);
+assert.match(dataSource, /if \(now < state\.qBackoffUntil\) return null;/);
+assert.match(dataSource, /province: textValue\(pick\(row, \['adm1', 'province', 'state'\]\)\)/);
+assert.match(dataSource, /return changed;\s*}\s*async function initializeWeather/);
 const sandbox = {
   AbortController,
   URL,
@@ -205,6 +254,16 @@ assert.ok(!hostSource.includes('int ch = MulDiv(h, EP_WEATHER_HEIGHT, 367);'), '
 assert.ok(hostSource.includes('_ep_Weather_ReboundBrowser(_this, bIsErrorPage);'), 'Fixed viewport changes must rebound WebView2 bounds.');
 for (const text of [
   'add_WebResourceRequested',
+  'ep_weather_theme_dark',
+  'ep_weather_theme_light',
+  'PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME',
+  'epw_Weather_SetDarkMode(_this, wParam ? 2 : 1, FALSE)',
+  'EP_WEATHER_WM_SET_NATIVE_THEME',
+  'epw_Weather_ApplyNativeThemeColors',
+  'DWMWA_CAPTION_COLOR',
+  'DWMWA_TEXT_COLOR',
+  'DWMWA_BORDER_COLOR',
+  'RGB(23, 27, 33)',
   'SetHeader(headers, L"X-QW-Api-Key", apiKey)',
   'EPQWeather_IsRequestUriForHost',
   'EP_WEATHER_WM_CAPTURE_DATA',

@@ -109,12 +109,34 @@ a { color: inherit; }
   padding: 12px 20px;
   border-bottom: 1px solid var(--line);
 }
-.location-row { display: flex; align-items: baseline; min-width: 0; gap: 8px; }
+.location-row { display: flex; align-items: baseline; min-width: 0; flex: 1 1 auto; gap: 8px; }
 .location-mark { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--red); }
 .location { min-width: 0; overflow: hidden; font-size: 18px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .resolved { min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.provider-state { max-width: 46%; flex: 0 0 auto; color: var(--muted); font-size: 11px; text-align: right; }
+.topbar-end { display: flex; align-items: center; min-width: 0; flex: 0 0 auto; gap: 10px; }
+.topbar-status { display: flex; align-items: baseline; min-width: 0; flex: 0 1 auto; gap: 7px; }
+.provider-state { max-width: 160px; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .provider-state.warning { color: var(--orange); font-weight: 650; }
+.update-status { max-width: 120px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-actions { display: flex; align-items: center; gap: 6px; }
+.icon-button {
+  display: inline-grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-button:hover { background: var(--surface-hover); color: var(--text); }
+.icon-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.icon-button:disabled { cursor: default; opacity: .55; }
+.control-icon { display: inline-block; font-size: 15px; line-height: 1; }
+#refresh-button.is-busy .control-icon { animation: ep-weather-spin .8s linear infinite; }
+@keyframes ep-weather-spin { to { transform: rotate(360deg); } }
 
 .alerts { display: grid; gap: 7px; margin: 12px 20px 0; }
 .alert {
@@ -129,11 +151,13 @@ a { color: inherit; }
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 9px;
-  min-height: 40px;
+  min-height: 42px;
   padding: 7px 12px 7px 10px;
   cursor: pointer;
   list-style: none;
+  background: color-mix(in srgb, var(--alert-color, var(--blue)) 9%, var(--surface));
 }
+.alert[open] summary { border-bottom: 1px solid var(--line); }
 .alert summary::-webkit-details-marker { display: none; }
 .alert summary::after {
   width: 7px;
@@ -153,7 +177,7 @@ a { color: inherit; }
 .alert-block strong { display: block; margin-bottom: 2px; color: var(--text); font-size: 10px; }
 
 .hero-section { padding: 18px 20px 16px; }
-.hero-main { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.hero-main { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .hero-primary { display: flex; align-items: center; min-width: 0; gap: 15px; }
 .weather-glyph {
   display: inline-grid;
@@ -172,30 +196,53 @@ a { color: inherit; }
 }
 .current-glyph { width: 88px; height: 88px; font-size: 82px; }
 #current-icon { display: none; }
+.temperature-stack { min-width: 0; }
 .temperature { display: flex; align-items: flex-start; white-space: nowrap; }
 .temperature span { font-size: 64px; font-weight: 700; line-height: .95; }
 .temperature small { margin: 3px 0 0 3px; color: var(--muted); font-size: 25px; font-weight: 500; }
-.condition-wrap { min-width: 0; text-align: right; }
-.condition { overflow-wrap: anywhere; font-size: 21px; font-weight: 700; }
+.condition-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.condition { overflow-wrap: anywhere; font-size: 20px; font-weight: 700; }
+.temperature-range { padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 10px; font-weight: 650; white-space: nowrap; }
 .updated { margin-top: 5px; color: var(--muted); font-size: 11px; }
+.hero-aside { display: flex; min-width: 0; max-width: 46%; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; }
+.hero-summary { max-width: 100%; padding: 6px 10px; border-radius: 7px; background: var(--blue-soft); color: var(--blue); font-size: 11px; font-weight: 650; overflow-wrap: anywhere; }
+.hero-context { max-width: 100%; color: var(--muted); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
 
 .details { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
-.detail { min-width: 0; min-height: 59px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.detail { min-width: 0; min-height: 72px; padding: 9px 10px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .detail-label { display: block; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-value { display: block; margin-top: 5px; overflow: hidden; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.detail-wind .detail-value { overflow: visible; font-size: 12px; line-height: 1.25; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+.detail-sub { display: block; min-height: 13px; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.detail-meter { height: 4px; margin-top: 7px; overflow: hidden; border-radius: 4px; background: var(--line); }
+.detail-meter span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--blue); transition: width .2s ease; }
 
 .section { padding: 17px 20px 19px; border-top: 1px solid var(--line); }
 .section-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 11px; }
 .section-title-group { display: flex; align-items: baseline; min-width: 0; gap: 8px; }
 .section-title { flex: 0 0 auto; font-size: 14px; font-weight: 700; }
 .section-note { min-width: 0; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.section-lead { min-width: 0; overflow: hidden; color: var(--muted); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .section-surface { overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .empty { padding: 13px; color: var(--muted); font-size: 11px; }
 
 .minute-surface { padding: 13px 15px 11px; }
-.minute-summary { color: var(--orange); font-size: 12px; font-weight: 650; }
-.minute-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 3px; height: 64px; margin-top: 10px; padding-top: 4px; border-bottom: 1px solid var(--line); }
+.minute-summary-row { display: flex; align-items: flex-start; gap: 7px; }
+.minute-dot { width: 7px; height: 7px; flex: 0 0 auto; margin-top: 5px; border-radius: 50%; background: var(--muted); }
+.minute-dot.is-raining { background: var(--orange); }
+.minute-summary { color: var(--text); font-size: 11px; font-weight: 650; line-height: 1.4; }
+.minute-summary.is-raining { color: var(--orange); }
+.minute-chart-wrap { position: relative; margin-top: 10px; padding-top: 3px; }
+.minute-chart { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 3px; height: 70px; padding-top: 4px; border-bottom: 1px solid var(--line); }
+.minute-thresholds { position: absolute; z-index: 0; inset: 4px 0 1px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+.minute-threshold { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; border-top: 1px dashed var(--line); color: var(--faint); font-size: 8px; line-height: 1; }
+.minute-threshold span { padding-left: 4px; background: var(--surface); }
 .minute-bar { min-height: 2px; border-radius: 3px 3px 0 0; background: var(--blue); }
+.minute-bar-none { background: var(--line); }
+.minute-bar-drizzle { background: #64b5dc; }
+.minute-bar-rain { background: var(--blue); }
+.minute-bar-heavy { background: var(--orange); }
 .minute-axis { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 5px; color: var(--faint); font-size: 9px; }
 .minute-axis span:nth-child(2), .minute-axis span:nth-child(3), .minute-axis span:nth-child(4) { text-align: center; }
 .minute-axis span:last-child { text-align: right; }
@@ -206,12 +253,15 @@ a { color: inherit; }
 .hourly::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 7px; background: var(--faint); background-clip: padding-box; }
 .hour { width: 70px; min-width: 70px; height: 96px; padding: 5px 3px; border-radius: 7px; text-align: center; scroll-snap-align: start; }
 .hour:hover { background: var(--surface-hover); }
+.hour.current { background: var(--blue-soft); box-shadow: inset 0 0 0 1px var(--blue); }
 .hour-time, .hour-temp, .hour-text, .hour-prob { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hour-time { color: var(--muted); font-size: 10px; }
 .hour .weather-glyph { margin: 4px auto 2px; font-size: 28px; }
 .hour-temp { font-size: 12px; font-weight: 700; }
 .hour-text { margin-top: 1px; color: var(--muted); font-size: 10px; }
-.hour-prob { margin-top: 3px; color: var(--blue); font-size: 10px; font-weight: 700; }
+.hour-prob { display: inline-block; max-width: 100%; margin-top: 3px; padding: 1px 5px; border: 1px solid transparent; border-radius: 4px; color: var(--blue); background: var(--blue-soft); font-size: 10px; font-weight: 700; }
+.hour-prob-medium { border-color: var(--amber); color: var(--amber); background: var(--surface-strong); }
+.hour-prob-high { border-color: var(--orange); color: var(--orange); background: var(--surface-strong); }
 
 .air-surface { padding: 14px 15px 12px; }
 .air-grid { display: grid; grid-template-columns: 124px minmax(0, 1fr); align-items: center; gap: 16px; }
@@ -220,17 +270,21 @@ a { color: inherit; }
 .aqi-category { margin-top: 4px; font-size: 11px; font-weight: 650; }
 .aqi-scale { position: relative; width: 86px; height: 4px; margin: 9px auto 0; border-radius: 4px; background: linear-gradient(90deg, #2fa458 0%, #d3a700 35%, #e87522 65%, #c83c35 100%); }
 .aqi-scale-dot { position: absolute; top: -3px; left: 0; width: 10px; height: 10px; margin-left: -5px; border: 2px solid var(--surface-strong); border-radius: 50%; background: var(--text); }
-.pollutants { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.pollutant { min-width: 0; padding: 3px 6px; border-left: 1px solid var(--line); text-align: center; }
-.pollutant:first-child { border-left: 0; }
+.pollutants { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.pollutant { min-width: 0; padding: 6px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-strong); text-align: center; }
+.pollutant-primary { border-color: var(--green); background: var(--green-soft); }
 .pollutant-name, .pollutant-value, .pollutant-unit { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pollutant-name { color: var(--muted); font-size: 9px; }
 .pollutant-value { margin-top: 3px; font-size: 12px; font-weight: 700; }
 .pollutant-unit { margin-top: 1px; color: var(--faint); font-size: 8px; }
 .air-advice { margin-top: 12px; padding: 7px 9px; border-left: 3px solid var(--green); background: var(--green-soft); color: var(--green); font-size: 10px; }
 
+@media (min-width: 441px) {
+  .temperature-stack > .updated { display: none; }
+}
+
 .forecast { overflow: hidden; }
-.day { display: grid; grid-template-columns: 80px 145px minmax(150px, 1fr); align-items: center; gap: 12px; min-height: 55px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.day { display: grid; grid-template-columns: 80px 145px 76px minmax(150px, 1fr); align-items: center; gap: 12px; min-height: 55px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
 .day:last-child { border-bottom: 0; }
 .day:hover { background: var(--surface-hover); }
 .day-date { min-width: 0; }
@@ -238,10 +292,10 @@ a { color: inherit; }
 .day-name { font-size: 12px; font-weight: 700; }
 .day-subdate { margin-top: 2px; color: var(--faint); font-size: 9px; }
 .day-weather { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; }
-.day .weather-glyph { grid-row: 1 / span 2; font-size: 26px; }
+.day .weather-glyph { font-size: 26px; }
 .day-text, .day-pop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .day-text { font-size: 11px; font-weight: 650; }
-.day-pop { color: var(--blue); font-size: 9px; font-weight: 700; }
+.day-pop { justify-self: start; padding: 3px 5px; border-radius: 4px; color: var(--blue); background: var(--blue-soft); font-size: 9px; font-weight: 700; }
 .day-range { display: grid; grid-template-columns: 34px minmax(70px, 1fr) 34px; align-items: center; gap: 8px; min-width: 0; }
 .day-low, .day-high { font-size: 10px; white-space: nowrap; }
 .day-low { color: var(--faint); text-align: right; }
@@ -257,6 +311,7 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
   .topbar, .hero-section, .section { padding-right: 15px; padding-left: 15px; }
   .alerts { margin-right: 15px; margin-left: 15px; }
   .hero-main { align-items: flex-start; }
+  .hero-aside { max-width: 42%; }
   .current-glyph { width: 78px; height: 78px; font-size: 72px; }
   .temperature span { font-size: 54px; }
   .temperature small { font-size: 21px; }
@@ -264,29 +319,37 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
   .air-grid { grid-template-columns: 100px minmax(0, 1fr); gap: 10px; }
   .aqi-main { padding-right: 10px; }
   .pollutants { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; }
-  .pollutant:nth-child(4) { border-left: 0; }
-  .day { grid-template-columns: 65px 120px minmax(115px, 1fr); gap: 8px; padding-right: 10px; padding-left: 10px; }
+  .day { grid-template-columns: 65px 120px 72px minmax(115px, 1fr); gap: 8px; padding-right: 10px; padding-left: 10px; }
 }
 
 @media (max-width: 440px) {
   .topbar { align-items: flex-start; }
   .resolved { display: none; }
-  .provider-state { max-width: 45%; }
+  .topbar-end { gap: 6px; }
+  .topbar-status { gap: 0; }
+  .provider-state { max-width: 100px; }
+  .update-status { display: none; }
   .alert summary { grid-template-columns: auto minmax(0, 1fr) auto; }
   .alert-time { display: none; }
   .alert-body { padding-left: 12px; }
   .hero-main { flex-direction: column; gap: 9px; }
-  .condition-wrap { text-align: left; }
+  .hero-aside { max-width: 100%; align-items: flex-start; text-align: left; }
   .condition { font-size: 18px; }
   .details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .detail:last-child { grid-column: 1 / -1; }
   .section-title-row { align-items: flex-start; flex-direction: column; gap: 2px; }
   .section-title-group { width: 100%; }
+  .section-lead { text-align: left; }
   .minute-chart { gap: 2px; }
+  .minute-threshold { font-size: 7px; }
   .air-grid { grid-template-columns: 1fr; }
   .aqi-main { padding: 0 0 12px; border-right: 0; border-bottom: 1px solid var(--line); }
-  .day { grid-template-columns: 54px 92px minmax(105px, 1fr); gap: 6px; }
+  .day { grid-template-columns: 54px minmax(0, 1fr); grid-template-areas: "date weather" "date pop" "range range"; gap: 4px 6px; }
+  .day-date { grid-area: date; }
+  .day-weather { grid-area: weather; }
+  .day-pop { grid-area: pop; }
   .day-range { grid-template-columns: 29px minmax(50px, 1fr) 29px; gap: 5px; }
+  .day-range { grid-area: range; }
   footer { justify-content: flex-start; flex-wrap: wrap; padding-right: 15px; padding-left: 15px; }
   footer .source-list { width: 100%; max-width: 100%; }
 }
@@ -300,7 +363,20 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
       <span class="location" id="location">Weather</span>
       <span class="resolved" id="resolved"></span>
     </div>
-    <span class="provider-state" id="provider-state"></span>
+    <div class="topbar-end">
+      <div class="topbar-status">
+        <span class="provider-state" id="provider-state"></span>
+        <span class="update-status" id="update-status"></span>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-button" id="theme-button" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <span class="control-icon" aria-hidden="true"></span>
+        </button>
+        <button class="icon-button" id="refresh-button" type="button" aria-label="Refresh weather" title="Refresh weather" disabled>
+          <span class="control-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
   </header>
 
   <div class="alerts" id="alerts" hidden></div>
@@ -310,29 +386,43 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
       <div class="hero-primary">
         <i class="weather-glyph current-glyph" id="current-glyph" role="img"></i>
         <canvas id="current-icon" width="96" height="96" aria-hidden="true"></canvas>
-        <div class="temperature"><span id="temperature">--</span><small id="unit">&#176;C</small></div>
+        <div class="temperature-stack">
+          <div class="temperature"><span id="temperature">--</span><small id="unit">&#176;C</small></div>
+          <div class="condition-line">
+            <div class="condition" id="condition">Loading...</div>
+            <span class="temperature-range" id="hero-range" hidden></span>
+          </div>
+          <div class="updated" id="updated"></div>
+        </div>
       </div>
-      <div class="condition-wrap">
-        <div class="condition" id="condition">Loading...</div>
-        <div class="updated" id="updated"></div>
+      <div class="hero-aside">
+        <div class="hero-summary" id="hero-summary" hidden></div>
+        <div class="hero-context" id="hero-context" hidden></div>
       </div>
     </div>
     <div class="details">
-      <div class="detail"><span class="detail-label" id="feels-label">Feels like</span><span class="detail-value" id="feels">--</span></div>
-      <div class="detail"><span class="detail-label" id="humidity-label">Humidity</span><span class="detail-value" id="humidity">--</span></div>
-      <div class="detail"><span class="detail-label" id="wind-label">Wind</span><span class="detail-value" id="wind">--</span></div>
-      <div class="detail"><span class="detail-label" id="precip-label">Precipitation</span><span class="detail-value" id="precip">--</span></div>
-      <div class="detail"><span class="detail-label" id="visibility-label">Visibility</span><span class="detail-value" id="visibility">--</span></div>
+      <div class="detail"><div class="detail-head"><span class="detail-label" id="feels-label">Feels like</span></div><span class="detail-value" id="feels">--</span><span class="detail-sub" id="feels-sub"></span></div>
+      <div class="detail"><div class="detail-head"><span class="detail-label" id="humidity-label">Humidity</span></div><span class="detail-value" id="humidity">--</span><div class="detail-meter" aria-hidden="true"><span id="humidity-meter"></span></div><span class="detail-sub" id="humidity-sub"></span></div>
+      <div class="detail detail-wind"><div class="detail-head"><span class="detail-label" id="wind-label">Wind</span></div><span class="detail-value" id="wind">--</span><span class="detail-sub" id="wind-sub"></span></div>
+      <div class="detail"><div class="detail-head"><span class="detail-label" id="precip-label">Precipitation</span></div><span class="detail-value" id="precip">--</span><span class="detail-sub" id="precip-sub"></span></div>
+      <div class="detail"><div class="detail-head"><span class="detail-label" id="visibility-label">Visibility</span></div><span class="detail-value" id="visibility">--</span><span class="detail-sub" id="visibility-sub"></span></div>
     </div>
   </section>
 
   <section class="section" id="minute-section" hidden>
     <div class="section-title-row">
       <div class="section-title-group"><span class="section-title" id="minute-title">Next 2 hours</span><span class="section-note" id="minute-updated"></span></div>
+      <span class="section-lead" id="minute-lead"></span>
     </div>
     <div class="section-surface minute-surface">
-      <div class="minute-summary" id="minute-summary"></div>
-      <div class="minute-chart" id="minute-chart"></div>
+      <div class="minute-summary-row"><span class="minute-dot" id="minute-dot" aria-hidden="true"></span><div class="minute-summary" id="minute-summary"></div></div>
+      <div class="minute-chart-wrap">
+        <div class="minute-thresholds" aria-hidden="true">
+          <div class="minute-threshold"><span id="minute-threshold-heavy"></span></div>
+          <div class="minute-threshold"><span id="minute-threshold-light"></span></div>
+        </div>
+        <div class="minute-chart" id="minute-chart"></div>
+      </div>
       <div class="minute-axis" id="minute-axis"></div>
     </div>
   </section>
@@ -340,6 +430,7 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
   <section class="section" id="hourly-section">
     <div class="section-title-row">
       <div class="section-title-group"><span class="section-title" id="hourly-title">24-hour forecast</span><span class="section-note" id="hourly-note"></span></div>
+      <span class="section-lead" id="hourly-lead"></span>
     </div>
     <div class="section-surface"><div class="hourly" id="hourly"></div></div>
   </section>
@@ -347,6 +438,7 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
   <section class="section" id="air-section" hidden>
     <div class="section-title-row">
       <div class="section-title-group"><span class="section-title" id="air-title">Air quality</span><span class="section-note" id="air-note"></span></div>
+      <span class="section-lead" id="air-lead"></span>
     </div>
     <div class="section-surface air-surface">
       <div class="air-grid">
@@ -364,6 +456,7 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
   <section class="section" id="daily-section">
     <div class="section-title-row">
       <div class="section-title-group"><span class="section-title" id="daily-title">5-day forecast</span><span class="section-note" id="daily-note"></span></div>
+      <span class="section-lead" id="daily-lead"></span>
     </div>
     <div class="section-surface forecast" id="forecast"></div>
   </section>
