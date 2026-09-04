@@ -1650,8 +1650,13 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_ExecuteScriptCompleted(GenericObjectWith
             }
             else if (!_wcsicmp(pResultObjectAsJson, L"\"ep_error\""))
             {
-                printf("[Weather] Open-Meteo request failed.\n");
-                _epw_Weather_NavigateToError(_this);
+                // The embedded provider has already rendered an actionable
+                // error state. Replacing it with the legacy error document
+                // makes Reload alternate between the two pages.
+                printf("[Weather] Provider rendered an error; keeping its document.\n");
+                _this->cntDataFetchAttempts = 0;
+                InterlockedExchange64(&_this->bIsNavigatingToError, FALSE);
+                InterlockedExchange64(&_this->bBrowserBusy, FALSE);
                 _this2->lpVtbl->Release(_this2);
                 return S_OK;
             }

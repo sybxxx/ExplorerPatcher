@@ -313,6 +313,14 @@ assert.match(
 );
 assert.ok(!hostSource.includes('int ch = MulDiv(h, EP_WEATHER_HEIGHT, 367);'), 'The native host must not resize from reported content height.');
 assert.ok(hostSource.includes('_ep_Weather_ReboundBrowser(_this, bIsErrorPage);'), 'Fixed viewport changes must rebound WebView2 bounds.');
+const providerErrorMarker = 'else if (!_wcsicmp(pResultObjectAsJson, L"\\\"ep_error\\\""))';
+const providerErrorStart = hostSource.indexOf(providerErrorMarker);
+const providerErrorEnd = hostSource.indexOf('else\n            {', providerErrorStart);
+if (providerErrorStart < 0 || providerErrorEnd < 0) throw new Error('Provider error branch was not found.');
+const providerErrorBranch = hostSource.slice(providerErrorStart, providerErrorEnd);
+assert.ok(providerErrorBranch.includes('Provider rendered an error; keeping its document.'), 'Provider errors must remain in the embedded document.');
+assert.ok(providerErrorBranch.includes('InterlockedExchange64(&_this->bBrowserBusy, FALSE)'), 'Provider errors must release the native busy state.');
+assert.ok(!providerErrorBranch.includes('_epw_Weather_NavigateToError'), 'Provider errors must not navigate to the legacy error page.');
 for (const text of [
   'add_WebResourceRequested',
   'ep_weather_theme_dark',

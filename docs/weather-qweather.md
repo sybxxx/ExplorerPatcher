@@ -62,6 +62,13 @@ Requests have a seven-second timeout and at most one retry for timeouts, HTTP 40
 
 Each dataset refreshes independently. A failure in alerts or air quality does not discard valid current or hourly weather. Old request generations cannot overwrite data after the location, language, units, or API Host change.
 
+Location and provider failures are rendered inside the embedded weather page.
+The native host releases its busy state without replacing that page with the
+legacy generic error document, so a failed `Reload` remains a single stable
+error state rather than alternating between two pages. Actual WebView2
+navigation or script failures still use the legacy error page and its bounded
+browser retry policy.
+
 The top-right controls are page-local controls. The refresh button requests the
 current six QWeather datasets in place and does not navigate or rebuild the
 WebView document. It is disabled while a refresh is running and for 15 seconds
