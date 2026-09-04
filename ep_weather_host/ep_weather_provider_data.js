@@ -16,6 +16,7 @@ const LOCATION_MODE_WINDOWS = 0;
 const LOCATION_MODE_LEGACY_PRECISE = 1;
 const LOCATION_MODE_DIRECT_IP = 2;
 const LOCATION_MODE_MANUAL = 3;
+const LOCATION_MODE_WINDOWS_NETWORK = 4;
 const LOCATION_MAX_ACCURACY_METERS = 50000;
 
 const state = {
@@ -237,7 +238,9 @@ function requestNativeLocation(mode, generation) {
   const requestId = `${Date.now().toString(36)}-${(++autoLocationSequence).toString(36)}`;
   const messagePrefix = mode === LOCATION_MODE_DIRECT_IP
     ? 'ep_weather_auto_location|'
-    : 'ep_weather_windows_location|';
+    : mode === LOCATION_MODE_WINDOWS_NETWORK
+      ? 'ep_weather_windows_network_location|'
+      : 'ep_weather_windows_location|';
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       autoLocationWaiters.delete(requestId);
@@ -262,6 +265,10 @@ function requestWindowsLocation(generation) {
   return requestNativeLocation(LOCATION_MODE_WINDOWS, generation);
 }
 
+function requestWindowsNetworkLocation(generation) {
+  return requestNativeLocation(LOCATION_MODE_WINDOWS_NETWORK, generation);
+}
+
 function normalizeDirectIpLocation(raw) {
   const latitude = finiteNumber(raw && raw.latitude);
   const longitude = finiteNumber(raw && raw.longitude);
@@ -284,14 +291,15 @@ function normalizeDirectIpLocation(raw) {
   };
 }
 
-function normalizeWindowsLocation(raw) {
+function normalizeWindowsLocation(raw, allowIp = false) {
   const latitude = finiteNumber(raw && raw.latitude);
   const longitude = finiteNumber(raw && raw.longitude);
   const accuracy = finiteNumber(raw && raw.accuracyMeters);
   const positionSource = finiteNumber(raw && raw.positionSource);
+  const validSources = allowIp ? [0, 1, 2, 3] : [0, 1, 2];
   if (latitude === null || longitude === null || latitude < -90 || latitude > 90 ||
       longitude < -180 || longitude > 180 || accuracy === null || accuracy <= 0 ||
-      accuracy > LOCATION_MAX_ACCURACY_METERS || ![0, 1, 2].includes(positionSource)) {
+      accuracy > LOCATION_MAX_ACCURACY_METERS || !validSources.includes(positionSource)) {
     throw new Error('Windows location is not accurate enough');
   }
   return {
@@ -303,8 +311,12 @@ function normalizeWindowsLocation(raw) {
     country: '',
     accuracyMeters: accuracy,
     positionSource,
-    source: 'Windows Location'
+    source: allowIp ? 'Windows Network Approximate' : 'Windows Location'
   };
+}
+
+function normalizeWindowsNetworkLocation(raw) {
+  return normalizeWindowsLocation(raw, true);
 }
 
 async function refineLocationWithQWeather(place, generation) {
@@ -332,6 +344,12 @@ async function resolveAutomaticLocation(generation) {
   if (state.locationMode === LOCATION_MODE_DIRECT_IP) {
     return refineLocationWithQWeather(
       normalizeDirectIpLocation(await requestDirectIpLocation(generation)),
+      generation
+    );
+  }
+  if (state.locationMode === LOCATION_MODE_WINDOWS_NETWORK) {
+    return refineLocationWithQWeather(
+      normalizeWindowsNetworkLocation(await requestWindowsNetworkLocation(generation)),
       generation
     );
   }

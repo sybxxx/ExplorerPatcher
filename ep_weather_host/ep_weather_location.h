@@ -10,6 +10,7 @@
 #define EP_WEATHER_LOCATION_MODE_LEGACY_PRECISE 1
 #define EP_WEATHER_LOCATION_MODE_DIRECT_IP 2
 #define EP_WEATHER_LOCATION_MODE_MANUAL 3
+#define EP_WEATHER_LOCATION_MODE_WINDOWS_NETWORK 4
 #define EP_WEATHER_LOCATION_MAX_ACCURACY_METERS 50000.0
 #define EP_WEATHER_LOCATION_SOURCE_CELLULAR 0
 #define EP_WEATHER_LOCATION_SOURCE_SATELLITE 1
@@ -36,6 +37,12 @@ extern "C" {
 #endif
 
 HRESULT EPWeather_BeginWindowsLocation(
+    HWND notifyWindow,
+    LONG64 browserGeneration,
+    LPCWSTR requestId
+);
+
+HRESULT EPWeather_BeginWindowsNetworkLocation(
     HWND notifyWindow,
     LONG64 browserGeneration,
     LPCWSTR requestId

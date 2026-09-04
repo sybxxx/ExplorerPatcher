@@ -44,13 +44,21 @@ as approximate. A VPN or transparent/TUN network that changes the direct route
 cannot be distinguished from the real network by this check. **Manual location
 only** disables both automatic sources.
 
+The optional **Windows network approximate location** mode uses the Windows
+`Geolocator` result without rejecting `PositionSource_IPAddress`. It is useful
+on an Ethernet-only computer when convenience is preferred over certainty, and
+the weather page labels the result as a Windows network approximation. It does
+not use the WebView2 proxy, but the result can still point to the wrong city and
+must not be treated as precise positioning. The strict Windows mode remains the
+default.
+
 ## Data and refresh policy
 
 The provider uses these endpoints:
 
 | Dataset | Endpoint | Refresh interval |
 | --- | --- | ---: |
-| Location | Windows `Geolocator`, then `/geo/v2/city/lookup` when configured | Once per page lifecycle |
+| Location | Windows `Geolocator` or an explicitly selected approximate source, then `/geo/v2/city/lookup` when configured | Once per page lifecycle |
 | Current conditions | `/weather/v1/current/{lat}/{lon}` | 10 minutes |
 | 24 hourly forecasts | `/weather/v1/hourly/{lat}/{lon}` | 60 minutes |
 | 5 daily forecasts | `/weather/v1/daily/{lat}/{lon}` | 3 hours |

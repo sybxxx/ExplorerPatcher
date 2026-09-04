@@ -429,8 +429,9 @@
 ;x 0 %R:1528%
 ;x 1 %R:1529%
 "WeatherTemperatureUnit"=dword:00000000
-;c 3 %R:1576%
+;c 4 %R:1576%
 ;x 0 %R:1577%
+;x 4 %R:1580%
 ;x 2 %R:1578%
 ;x 3 %R:1579%
 "WeatherLocationType"=dword:00000000

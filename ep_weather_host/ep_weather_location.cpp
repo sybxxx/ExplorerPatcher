@@ -36,6 +36,7 @@ namespace
         HWND notifyWindow;
         LONG64 browserGeneration;
         BOOL directIp;
+        BOOL allowWindowsIp;
         WCHAR requestId[EP_WEATHER_AUTO_LOCATION_REQUEST_ID_MAX];
     };
 
@@ -251,7 +252,7 @@ namespace
         return S_OK;
     }
 
-    HRESULT ReadWindowsLocation(EPWeatherLocationResult* result)
+    HRESULT ReadWindowsLocation(EPWeatherLocationResult* result, BOOL allowWindowsIp)
     {
         if (!result)
         {
@@ -365,11 +366,15 @@ namespace
         }
         result->positionSource = static_cast<LONG>(positionSource);
 
-        // PositionSource_IPAddress is intentionally rejected. It is still an
-        // IP approximation, even when the result came through Windows APIs.
-        if (positionSource != PositionSource_Cellular &&
-            positionSource != PositionSource_Satellite &&
-            positionSource != PositionSource_WiFi)
+        // PositionSource_IPAddress is accepted only for the explicit Windows
+        // network-approximate mode. The strict default still rejects it,
+        // even when the result came through Windows APIs.
+        const BOOL isSensorSource =
+            positionSource == PositionSource_Cellular ||
+            positionSource == PositionSource_Satellite ||
+            positionSource == PositionSource_WiFi;
+        const BOOL isIpSource = static_cast<LONG>(positionSource) == EP_WEATHER_LOCATION_SOURCE_IP;
+        if (!isSensorSource && !(allowWindowsIp && isIpSource))
         {
             return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
         }
@@ -434,7 +439,7 @@ namespace
             }
             else
             {
-                hr = ReadWindowsLocation(result);
+                hr = ReadWindowsLocation(result, request->allowWindowsIp);
             }
             result->status = hr;
             if (FAILED(hr))
@@ -466,7 +471,8 @@ static HRESULT EPWeather_BeginLocation(
     HWND notifyWindow,
     LONG64 browserGeneration,
     LPCWSTR requestId,
-    BOOL directIp
+    BOOL directIp,
+    BOOL allowWindowsIp
 )
 {
     if (!notifyWindow || !IsWindow(notifyWindow) || !requestId || !requestId[0] ||
@@ -487,6 +493,7 @@ static HRESULT EPWeather_BeginLocation(
     request->notifyWindow = notifyWindow;
     request->browserGeneration = browserGeneration;
     request->directIp = directIp;
+    request->allowWindowsIp = allowWindowsIp;
     HRESULT hr = StringCchCopyW(request->requestId, ARRAYSIZE(request->requestId), requestId);
     if (FAILED(hr))
     {
@@ -511,7 +518,16 @@ extern "C" HRESULT EPWeather_BeginWindowsLocation(
     LPCWSTR requestId
 )
 {
-    return EPWeather_BeginLocation(notifyWindow, browserGeneration, requestId, FALSE);
+    return EPWeather_BeginLocation(notifyWindow, browserGeneration, requestId, FALSE, FALSE);
+}
+
+extern "C" HRESULT EPWeather_BeginWindowsNetworkLocation(
+    HWND notifyWindow,
+    LONG64 browserGeneration,
+    LPCWSTR requestId
+)
+{
+    return EPWeather_BeginLocation(notifyWindow, browserGeneration, requestId, FALSE, TRUE);
 }
 
 extern "C" HRESULT EPWeather_BeginDirectIpLocation(
@@ -520,5 +536,5 @@ extern "C" HRESULT EPWeather_BeginDirectIpLocation(
     LPCWSTR requestId
 )
 {
-    return EPWeather_BeginLocation(notifyWindow, browserGeneration, requestId, TRUE);
+    return EPWeather_BeginLocation(notifyWindow, browserGeneration, requestId, TRUE, FALSE);
 }

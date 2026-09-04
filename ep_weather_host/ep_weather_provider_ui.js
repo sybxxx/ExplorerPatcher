@@ -76,6 +76,10 @@ function labels() {
     windowsLocationUnavailable: 'Windows \u5b9a\u4f4d\u4e0d\u53ef\u7528',
     windowsLocationError: 'Windows \u65e0\u6cd5\u63d0\u4f9b\u53ef\u9760\u4f4d\u7f6e\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
     windowsIpLocationError: 'Windows \u4ec5\u8fd4\u56de IP \u8fd1\u4f3c\u4f4d\u7f6e\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
+    windowsNetworkLocation: '\u6b63\u5728\u4f7f\u7528 Windows \u7f51\u7edc\u8fd1\u4f3c\u5b9a\u4f4d...',
+    windowsNetworkLocationUnavailable: 'Windows \u7f51\u7edc\u8fd1\u4f3c\u5b9a\u4f4d\u4e0d\u53ef\u7528',
+    windowsNetworkLocationError: 'Windows \u7f51\u7edc\u8fd1\u4f3c\u5b9a\u4f4d\u5931\u8d25\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
+    windowsNetworkLocationSource: 'Windows \u7f51\u7edc\u8fd1\u4f3c',
     directIpLocation: '\u6b63\u5728\u4f7f\u7528\u76f4\u8fde IP \u8fd1\u4f3c\u5b9a\u4f4d...',
     directIpUnavailable: '\u76f4\u8fde IP \u8fd1\u4f3c\u5b9a\u4f4d\u4e0d\u53ef\u7528',
     directIpError: '\u76f4\u8fde IP \u8fd1\u4f3c\u5b9a\u4f4d\u5931\u8d25\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
@@ -146,6 +150,10 @@ function labels() {
     windowsLocationUnavailable: 'Windows location unavailable',
     windowsLocationError: 'Windows could not provide a reliable location; enter one manually',
     windowsIpLocationError: 'Windows returned only an IP approximation; enter one manually',
+    windowsNetworkLocation: 'Locating with Windows network approximation...',
+    windowsNetworkLocationUnavailable: 'Windows network approximation unavailable',
+    windowsNetworkLocationError: 'Windows network approximation failed; enter a location manually',
+    windowsNetworkLocationSource: 'Windows network approximate',
     directIpLocation: 'Locating through a direct IP connection...',
     directIpUnavailable: 'Direct IP approximate location unavailable',
     directIpError: 'Direct IP location failed; enter a location manually',
@@ -347,6 +355,7 @@ function hasCurrentData() {
 
 function automaticLocationLabel() {
   const value = labels();
+  if (state.locationMode === LOCATION_MODE_WINDOWS_NETWORK) return value.windowsNetworkLocation;
   if (state.locationMode === LOCATION_MODE_DIRECT_IP) return value.directIpLocation;
   if (state.locationMode === LOCATION_MODE_MANUAL) return value.manualLocationError;
   return value.windowsLocation;
@@ -354,6 +363,7 @@ function automaticLocationLabel() {
 
 function automaticLocationErrorLabel() {
   const value = labels();
+  if (state.locationMode === LOCATION_MODE_WINDOWS_NETWORK) return value.windowsNetworkLocationError;
   if (state.locationMode === LOCATION_MODE_DIRECT_IP) return value.directIpError;
   if (state.locationMode === LOCATION_MODE_MANUAL) return value.manualLocationError;
   if (state.errors.initialization === 'Windows location returned IP source') return value.windowsIpLocationError;
@@ -362,6 +372,7 @@ function automaticLocationErrorLabel() {
 
 function automaticLocationErrorTitle() {
   const value = labels();
+  if (state.locationMode === LOCATION_MODE_WINDOWS_NETWORK) return value.windowsNetworkLocationUnavailable;
   if (state.locationMode === LOCATION_MODE_DIRECT_IP) return value.directIpUnavailable;
   if (state.locationMode === LOCATION_MODE_MANUAL) return value.manualLocationTitle;
   return value.windowsLocationUnavailable;
@@ -1095,7 +1106,9 @@ function renderWeather() {
     .map((part) => textValue(part))
     .filter((part, index, array) => part && array.indexOf(part) === index && part !== elements.location.textContent);
   const locationSource = textValue(state.place && state.place.source);
-  if (/^Windows Location/i.test(locationSource)) {
+  if (/^Windows Network Approximate/i.test(locationSource)) {
+    resolvedParts.push(value.windowsNetworkLocationSource);
+  } else if (/^Windows Location/i.test(locationSource)) {
     resolvedParts.push(value.windowsLocationSource);
   } else if (/^Direct IP/i.test(locationSource)) {
     resolvedParts.push(value.directIpSource);
@@ -1203,7 +1216,7 @@ window.epWeatherGetData = function(location, language, unit, width, height, apiH
   const cleanHost = validQWeatherHost(apiHost) ? textValue(apiHost).toLowerCase() : '';
   const numericLocationMode = Number(locationMode);
   const selectedLocationMode = [LOCATION_MODE_WINDOWS, LOCATION_MODE_LEGACY_PRECISE,
-    LOCATION_MODE_DIRECT_IP, LOCATION_MODE_MANUAL].includes(numericLocationMode)
+    LOCATION_MODE_DIRECT_IP, LOCATION_MODE_MANUAL, LOCATION_MODE_WINDOWS_NETWORK].includes(numericLocationMode)
     ? numericLocationMode : LOCATION_MODE_WINDOWS;
   const key = `${cleanLocation}\n${cleanLanguage}\n${selectedUnit}\n${cleanHost}\n${selectedLocationMode}`;
   state.iconWidth = width;
@@ -1248,6 +1261,7 @@ if (window.__epWeatherTestMode) {
     normalizeOpenMeteo,
     normalizeDirectIpLocation,
     normalizeWindowsLocation,
+    normalizeWindowsNetworkLocation,
     validQWeatherHost,
     refreshDue,
     DATASET_TTL,

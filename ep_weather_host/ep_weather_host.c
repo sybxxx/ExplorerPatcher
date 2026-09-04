@@ -1441,11 +1441,19 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
     if (SUCCEEDED(args->lpVtbl->TryGetWebMessageAsString(args, &message)) && message)
     {
         static const WCHAR windowsLocationPrefix[] = L"ep_weather_windows_location|";
+        static const WCHAR windowsNetworkLocationPrefix[] = L"ep_weather_windows_network_location|";
         static const WCHAR directIpLocationPrefix[] = L"ep_weather_auto_location|";
         LPCWSTR locationPrefix = NULL;
         BOOL directIp = FALSE;
+        BOOL allowWindowsIp = FALSE;
         size_t locationPrefixLength = 0;
-        if (!_wcsnicmp(message, windowsLocationPrefix, ARRAYSIZE(windowsLocationPrefix) - 1))
+        if (!_wcsnicmp(message, windowsNetworkLocationPrefix, ARRAYSIZE(windowsNetworkLocationPrefix) - 1))
+        {
+            locationPrefix = windowsNetworkLocationPrefix;
+            locationPrefixLength = ARRAYSIZE(windowsNetworkLocationPrefix) - 1;
+            allowWindowsIp = TRUE;
+        }
+        else if (!_wcsnicmp(message, windowsLocationPrefix, ARRAYSIZE(windowsLocationPrefix) - 1))
         {
             locationPrefix = windowsLocationPrefix;
             locationPrefixLength = ARRAYSIZE(windowsLocationPrefix) - 1;
@@ -1473,22 +1481,36 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
                 );
                 _this->dwAutoLocationBrowserGeneration =
                     InterlockedAdd64(&_this->dwBrowserGeneration, 0);
-                HRESULT locationHr = directIp
-                    ? EPWeather_BeginDirectIpLocation(
-                        _this->hWnd,
-                        _this->dwAutoLocationBrowserGeneration,
-                        requestId
-                    )
-                    : EPWeather_BeginWindowsLocation(
+                HRESULT locationHr = E_FAIL;
+                if (directIp)
+                {
+                    locationHr = EPWeather_BeginDirectIpLocation(
                         _this->hWnd,
                         _this->dwAutoLocationBrowserGeneration,
                         requestId
                     );
+                }
+                else if (allowWindowsIp)
+                {
+                    locationHr = EPWeather_BeginWindowsNetworkLocation(
+                        _this->hWnd,
+                        _this->dwAutoLocationBrowserGeneration,
+                        requestId
+                    );
+                }
+                else
+                {
+                    locationHr = EPWeather_BeginWindowsLocation(
+                        _this->hWnd,
+                        _this->dwAutoLocationBrowserGeneration,
+                        requestId
+                    );
+                }
                 if (FAILED(locationHr))
                 {
                     printf(
                         "[AutoLocation] Failed to start %s lookup: 0x%08x.\n",
-                        directIp ? "direct IP" : "Windows location",
+                        directIp ? "direct IP" : allowWindowsIp ? "Windows network approximate" : "Windows location",
                         (unsigned int)locationHr
                     );
                     epw_Weather_PostAutoLocationError(_this, requestId);
@@ -1496,7 +1518,10 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
                 }
                 else
                 {
-                    printf("[AutoLocation] %s lookup started.\n", directIp ? "Direct IP" : "Windows location");
+                    printf(
+                        "[AutoLocation] %s lookup started.\n",
+                        directIp ? "Direct IP" : allowWindowsIp ? "Windows network approximate" : "Windows location"
+                    );
                 }
             }
         }

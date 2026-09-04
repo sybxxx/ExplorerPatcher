@@ -265,7 +265,7 @@ BEGIN
 
     IDS_WEATHER_SHOW            "Show Weather on the taskbar"
     IDS_WEATHER_LOC             "Location"
-    IDS_WEATHER_LOC_PROMPT      "Enter a city, district, or postal code for weather information. Leave this blank to use Windows precise location. If Windows has no reliable location source, enter a location manually or select an approximate IP source below."
+    IDS_WEATHER_LOC_PROMPT      "Enter a city, district, or postal code for weather information. Leave this blank to use Windows precise location. If Windows has no reliable precise source, enter a location manually or select an explicitly labeled approximate source below."
     IDS_WEATHER_LOC_DEFAULT     "Automatic location (Windows precise)"
     IDS_WEATHER_LAYOUT          "Layout"
     IDS_WEATHER_LAYOUT_0        "Icon and description (default)"
@@ -338,6 +338,7 @@ BEGIN
     IDS_WEATHER_LOCATION_MODE_0 "Windows precise location (default)"
     IDS_WEATHER_LOCATION_MODE_2 "Direct IP approximate location"
     IDS_WEATHER_LOCATION_MODE_3 "Manual location only"
+    IDS_WEATHER_LOCATION_MODE_4 "Windows network approximate location"
 
     IDS_SP                      "Spotlight"
 

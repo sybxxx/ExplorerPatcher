@@ -47,7 +47,10 @@ for (const text of [
   '/geo/v2/city/lookup',
   'ep_weather_auto_location|',
   'ep_weather_windows_location|',
+  'ep_weather_windows_network_location|',
+  'LOCATION_MODE_WINDOWS_NETWORK',
   'normalizeWindowsLocation',
+  'normalizeWindowsNetworkLocation',
   'requestDirectIpLocation',
   'normalizeDirectIpLocation',
   'resolveAutomaticLocation',
@@ -103,6 +106,9 @@ for (const text of [
   'positionSource',
   'Windows location returned IP source',
   'windowsIpLocationError',
+  'windowsNetworkLocation',
+  'windowsNetworkLocationSource',
+  'Windows Network Approximate',
   'MANUAL_REFRESH_COOLDOWN',
   'refreshWeatherNow',
   'hero-range',
@@ -176,7 +182,7 @@ vm.createContext(sandbox);
 vm.runInContext(`${dataSource}\n;globalThis.weatherTests = {
   normalizeQCurrent, normalizeQHourly, normalizeQDaily, normalizeQMinutely,
   normalizeQAlerts, normalizeQAir, normalizeOpenMeteo, validQWeatherHost,
-  normalizeDirectIpLocation, normalizeWindowsLocation
+  normalizeDirectIpLocation, normalizeWindowsLocation, normalizeWindowsNetworkLocation
 };`, sandbox);
 const normalizers = sandbox.weatherTests;
 
@@ -291,6 +297,14 @@ assert.throws(
   () => normalizers.normalizeWindowsLocation({ latitude: 26.89, longitude: 112.57, accuracyMeters: 35, positionSource: 3 }),
   /Windows location is not accurate enough/
 );
+const windowsNetworkLocation = normalizers.normalizeWindowsNetworkLocation({
+  latitude: 26.89,
+  longitude: 112.57,
+  accuracyMeters: 4909,
+  positionSource: 3
+});
+assert.strictEqual(windowsNetworkLocation.positionSource, 3);
+assert.strictEqual(windowsNetworkLocation.source, 'Windows Network Approximate');
 
 assert.strictEqual(normalizers.validQWeatherHost('abc123.qweatherapi.com'), true);
 assert.strictEqual(normalizers.validQWeatherHost('qweatherapi.com.evil.example'), false);
@@ -365,6 +379,8 @@ for (const text of [
   'PositionSource_IPAddress',
   'PositionSource_WiFi',
   'EPWeather_BeginWindowsLocation',
+  'EPWeather_BeginWindowsNetworkLocation',
+  'ep_weather_windows_network_location|',
   'accuracyMeters'
 ]) {
   if (!locationSource.includes(text) && !hostSource.includes(text)) {
@@ -397,18 +413,20 @@ async function verifyNativeLocationModes(source) {
     },
     postMessage: (message) => {
       postedMessages.push(message);
+      const windowsNetworkPrefix = 'ep_weather_windows_network_location|';
       const windowsPrefix = 'ep_weather_windows_location|';
       const directPrefix = 'ep_weather_auto_location|';
+      const isWindowsNetwork = message.startsWith(windowsNetworkPrefix);
       const isWindows = message.startsWith(windowsPrefix);
-      const prefix = isWindows ? windowsPrefix : directPrefix;
-      if (!isWindows && !message.startsWith(directPrefix)) throw new Error(`Unexpected native message: ${message}`);
+      const prefix = isWindowsNetwork ? windowsNetworkPrefix : isWindows ? windowsPrefix : directPrefix;
+      if (!isWindowsNetwork && !isWindows && !message.startsWith(directPrefix)) throw new Error(`Unexpected native message: ${message}`);
       const requestId = message.slice(prefix.length);
       const payload = JSON.stringify({
         ok: true,
         latitude: 26.89,
         longitude: 112.57,
-        accuracyMeters: isWindows ? nextWindowsAccuracy : 0,
-        positionSource: isWindows ? 2 : 3
+        accuracyMeters: isWindowsNetwork ? 4909 : isWindows ? nextWindowsAccuracy : 0,
+        positionSource: isWindowsNetwork || !isWindows ? 3 : 2
       });
       for (const listener of nativeMessageListeners) {
         listener({ data: `ep_weather_location_result|${requestId}|${payload}` });
@@ -428,6 +446,11 @@ async function verifyNativeLocationModes(source) {
   assert.ok(postedMessages[1].startsWith('ep_weather_auto_location|'), 'Direct IP must remain an explicit mode');
   assert.strictEqual(directLocation.source, 'Direct IP');
 
+  sandbox.locationTests.state.locationMode = 4;
+  const windowsNetworkLocation = await sandbox.locationTests.resolveAutomaticLocation(0);
+  assert.ok(postedMessages[2].startsWith('ep_weather_windows_network_location|'), 'Windows network approximate mode must use its explicit native message');
+  assert.strictEqual(windowsNetworkLocation.source, 'Windows Network Approximate');
+
   sandbox.locationTests.state.locationMode = 0;
   nextWindowsAccuracy = 50001;
   await assert.rejects(
@@ -445,6 +468,8 @@ for (const settingsPath of settingsPaths) {
   if (settings.includes('WeatherQWeatherApiKeyProtected') || settings.includes('WeatherQWeatherApiHost')) {
     throw new Error('QWeather credentials must not be included in settings export templates.');
   }
+  assert.match(settings, /;c 4 %R:1576%/);
+  assert.match(settings, /;x 4 %R:1580%/);
 }
 
 verifyNativeLocationModes(dataSource).then(() => {
