@@ -15,6 +15,14 @@ const settingsPaths = [
   path.join(root, '..', 'ep_gui', 'resources', 'settings.reg'),
   path.join(root, '..', 'ep_gui', 'resources', 'settings10.reg')
 ];
+const zhCnGuiPath = path.join(
+  root,
+  '..',
+  'ExplorerPatcher-L10N',
+  'resources',
+  'lang',
+  'ep_gui.zh-CN.rc'
+);
 
 childProcess.execFileSync(process.execPath, [path.join(root, 'generate_weather_provider_header.js'), '--check']);
 
@@ -476,6 +484,16 @@ for (const settingsPath of settingsPaths) {
   }
   assert.match(settings, /;c 4 %R:1576%/);
   assert.match(settings, /;x 4 %R:1580%/);
+}
+const zhCnGui = fs.readFileSync(zhCnGuiPath, 'utf8');
+for (const label of [
+  'IDS_WEATHER_LOCATION_MODE   "自动位置来源"',
+  'IDS_WEATHER_LOCATION_MODE_0 "Windows 精确定位(默认)"',
+  'IDS_WEATHER_LOCATION_MODE_2 "直接 IP 近似定位"',
+  'IDS_WEATHER_LOCATION_MODE_3 "仅使用手动地点"',
+  'IDS_WEATHER_LOCATION_MODE_4 "Windows 网络近似定位"'
+]) {
+  assert.ok(zhCnGui.includes(label), `Missing Chinese weather location label: ${label}`);
 }
 
 verifyNativeLocationModes(dataSource).then(() => {
