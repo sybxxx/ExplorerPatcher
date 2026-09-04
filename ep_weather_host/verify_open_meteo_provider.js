@@ -386,6 +386,8 @@ for (const text of [
   'dwDarkMode < EP_WEATHER_THEME_SYSTEM || dwDarkMode > EP_WEATHER_THEME_DARK',
   'EP_WEATHER_WM_SYNC_THEME',
   'EP_WEATHER_THEME_SYSTEM',
+  'ShouldAppsUseDarkMode',
+  'bAppsUseDarkMode',
   'EP_WEATHER_WM_SET_NATIVE_THEME',
   'epw_Weather_ApplyNativeThemeColors',
   'DWMWA_CAPTION_COLOR',

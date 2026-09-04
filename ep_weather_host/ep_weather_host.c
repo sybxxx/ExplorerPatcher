@@ -2476,8 +2476,15 @@ HRESULT STDMETHODCALLTYPE epw_Weather_IsDarkMode(EPWeather* _this, LONG64 dwDark
     DwmIsCompositionEnabled(&bIsCompositionEnabled);
     if (dwDarkMode == EP_WEATHER_THEME_SYSTEM)
     {
-        RTL_OSVERSIONINFOW rovi;
-        *bEnabled = bIsCompositionEnabled && ((global_rovi.dwBuildNumber < 18985) ? TRUE : (ShouldSystemUseDarkMode ? ShouldSystemUseDarkMode() : FALSE)) && !IsHighContrast();
+        // The weather flyout is an app surface. Follow the Windows app color
+        // setting rather than the shell/taskbar setting, which can be dark
+        // while apps are configured to remain light.
+        BOOL bAppsUseDarkMode = global_rovi.dwBuildNumber < 18985
+            ? TRUE
+            : ShouldAppsUseDarkMode
+                ? ShouldAppsUseDarkMode()
+                : ShouldSystemUseDarkMode ? ShouldSystemUseDarkMode() : FALSE;
+        *bEnabled = bIsCompositionEnabled && bAppsUseDarkMode && !IsHighContrast();
     }
     else
     {

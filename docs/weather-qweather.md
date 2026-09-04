@@ -82,10 +82,12 @@ current six QWeather datasets in place and does not navigate or rebuild the
 WebView document. It is disabled while a refresh is running and for 15 seconds
 afterwards; the QWeather authentication guard, in-flight protection, and 429
 backoff still apply. The theme button cycles through **follow system -> light ->
-dark -> follow system**. Follow-system is the initial state, and Windows color
-scheme changes are reflected without reopening the weather panel. The selected
-mode is not persisted as an ExplorerPatcher setting; the Weather properties
-page still provides the persistent system, light, and dark choices.
+dark -> follow system**. Follow-system is the initial state, and Windows app
+color-scheme changes are reflected without reopening the weather panel. The
+weather flyout follows the Windows app preference (`AppsUseLightTheme`) rather
+than the separate shell/taskbar preference, so the two can legitimately differ.
+The selected mode is not persisted as an ExplorerPatcher setting; the Weather
+properties page still provides the persistent system, light, and dark choices.
 
 The page and native weather host exchange the selected mode explicitly. This
 keeps the caption, caption text, border, backdrop, WebView media override, and
