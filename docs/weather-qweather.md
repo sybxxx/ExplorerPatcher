@@ -81,13 +81,18 @@ The top-right controls are page-local controls. The refresh button requests the
 current six QWeather datasets in place and does not navigate or rebuild the
 WebView document. It is disabled while a refresh is running and for 15 seconds
 afterwards; the QWeather authentication guard, in-flight protection, and 429
-backoff still apply. The theme button follows the Windows/WebView color scheme
-until clicked, then switches between light and dark mode for the current weather
-host lifetime. Theme choice is not persisted as an ExplorerPatcher setting.
-When the theme button is used, the page also notifies the native weather host so
-the caption, caption text, border, and backdrop follow the selected page theme
-instead of leaving a light non-client strip above a dark document. The native
-host reapplies these colors when Windows broadcasts a color-scheme change.
+backoff still apply. The theme button cycles through **follow system -> light ->
+dark -> follow system**. Follow-system is the initial state, and Windows color
+scheme changes are reflected without reopening the weather panel. The selected
+mode is not persisted as an ExplorerPatcher setting; the Weather properties
+page still provides the persistent system, light, and dark choices.
+
+The page and native weather host exchange the selected mode explicitly. This
+keeps the caption, caption text, border, backdrop, WebView media override, and
+document colors synchronized instead of leaving a light non-client strip above
+a dark document. A setting change or browser recreation also sends the mode
+back to the document so a stale page-local override cannot hide the system
+choice.
 
 ## Fallback and attribution
 
@@ -133,6 +138,7 @@ The maintainable provider sources are:
 - `ep_weather_host/ep_weather_provider_shell.html`
 - `ep_weather_host/ep_weather_provider_data.js`
 - `ep_weather_host/ep_weather_provider_icons.js`
+- `ep_weather_host/ep_weather_provider_theme.js`
 - `ep_weather_host/ep_weather_provider_ui.js`
 - `ep_weather_host/ep_weather_location.cpp`
 - `ep_weather_host/ep_weather_location.h`

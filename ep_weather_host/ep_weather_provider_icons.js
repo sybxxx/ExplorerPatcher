@@ -57,7 +57,7 @@ function drawWeatherIcon(canvas, item, provider) {
   const context = canvas.getContext('2d', { willReadFrequently: true });
   const glyph = weatherIconGlyph(item, provider, true);
   const size = Math.round(Math.min(canvas.width, canvas.height) * 0.88);
-  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = weatherThemeIsDark();
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.save();
   context.font = `${size}px "QWeather Icons"`;

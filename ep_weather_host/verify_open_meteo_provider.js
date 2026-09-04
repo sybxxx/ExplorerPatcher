@@ -7,9 +7,12 @@ const vm = require('vm');
 const root = __dirname;
 const headerPath = path.join(root, 'ep_weather_provider_open_meteo_html.h');
 const dataPath = path.join(root, 'ep_weather_provider_data.js');
+const themePath = path.join(root, 'ep_weather_provider_theme.js');
 const iconFontPath = path.join(root, 'assets', 'qweather-icons-1.8.0.woff2');
 const iconMapPath = path.join(root, 'assets', 'qweather-icons-1.8.0.json');
 const hostPath = path.join(root, 'ep_weather_host.c');
+const weatherHeaderPath = path.join(root, 'ep_weather.h');
+const locationHeaderPath = path.join(root, 'ep_weather_location.h');
 const configPath = path.join(root, '..', 'ExplorerPatcher', 'weather_qweather_config.c');
 const settingsPaths = [
   path.join(root, '..', 'ep_gui', 'resources', 'settings.reg'),
@@ -89,6 +92,9 @@ for (const text of [
   'refreshWeatherNow',
   'theme-button',
   'refresh-button',
+  'ep_weather_theme_mode|',
+  'WEATHER_THEME_SYSTEM',
+  'nextWeatherThemeMode',
   'hero-range',
   'hero-summary',
   'minute-thresholds',
@@ -107,6 +113,7 @@ for (const text of [
   'notifyNativeTheme',
   'ep_weather_theme_dark',
   'ep_weather_theme_light',
+  'ep_weather_theme_system',
   'ep_weather_auto_location_result|',
   'ep_weather_auto_location_error|',
   'ep_weather_location_result|',
@@ -142,7 +149,7 @@ for (const text of [
 }
 assert.ok(!html.includes('function contentHeight'), 'The provider must not report dynamic content height.');
 assert.match(html, /#\$\{NATIVE_VIEWPORT_HEIGHT\}#/);
-assert.match(html, /postMessage\(theme === 'dark'[\s\S]*?ep_weather_theme_dark/);
+assert.match(html, /postMessage\(mode === WEATHER_THEME_DARK[\s\S]*?ep_weather_theme_system/);
 assert.match(html, /summary\.addEventListener\('click', \(\) => \{[\s\S]*?state\.alertOpenStates\.set\(key, !details\.open\);[\s\S]*?\}\);/);
 assert.match(html, /details\.addEventListener\('toggle', \(\) => \{[\s\S]*?state\.alertOpenStates\.set\(key, details\.open\);[\s\S]*?\}\);/);
 assert.ok(!html.includes("details.addEventListener('toggle', notifyHost)"), 'Alert disclosure must not trigger a native taskbar recapture.');
@@ -176,6 +183,25 @@ assert.match(dataSource, /if \(!force && now < \(state\.nextDue\[name\] \|\| 0\)
 assert.match(dataSource, /if \(now < state\.qBackoffUntil\) return null;/);
 assert.match(dataSource, /province: textValue\(pick\(row, \['adm1', 'province', 'state'\]\)\)/);
 assert.match(dataSource, /return changed;\s*}\s*async function initializeWeather/);
+const themeSource = fs.readFileSync(themePath, 'utf8');
+new vm.Script(themeSource);
+const themeSandbox = {};
+vm.createContext(themeSandbox);
+vm.runInContext(`${themeSource}\n;globalThis.themeTests = {
+  normalizeWeatherThemeMode, nextWeatherThemeMode
+};`, themeSandbox);
+const themeTests = themeSandbox.themeTests;
+assert.strictEqual(themeTests.normalizeWeatherThemeMode(undefined), 'system');
+assert.deepStrictEqual(
+  ['system', 'light', 'dark', 'system'],
+  [
+    'system',
+    themeTests.nextWeatherThemeMode('system'),
+    themeTests.nextWeatherThemeMode('light'),
+    themeTests.nextWeatherThemeMode('dark')
+  ]
+);
+assert.strictEqual(themeTests.normalizeWeatherThemeMode('unexpected'), 'system');
 const sandbox = {
   AbortController,
   URL,
@@ -319,7 +345,12 @@ assert.strictEqual(normalizers.validQWeatherHost('qweatherapi.com.evil.example')
 assert.strictEqual(normalizers.validQWeatherHost('https://abc123.qweatherapi.com'), false);
 
 const hostSource = fs.readFileSync(hostPath, 'utf8');
+const weatherHeader = fs.readFileSync(weatherHeaderPath, 'utf8');
+const locationHeader = fs.readFileSync(locationHeaderPath, 'utf8');
 const locationSource = fs.readFileSync(path.join(root, 'ep_weather_location.cpp'), 'utf8');
+assert.match(weatherHeader, /EP_WEATHER_WM_SYNC_THEME \(WM_USER \+ 20\)/);
+assert.ok(!weatherHeader.includes('EP_WEATHER_WM_SYNC_THEME (WM_USER + 19)'), 'Theme synchronization must not reuse the native location message ID.');
+assert.ok(!locationHeader.includes('EP_WEATHER_WM_AUTO_LOCATION_RESULT (WM_USER + 20)'), 'Theme synchronization must not collide with native location messages.');
 assert.match(
   hostSource,
   /InterlockedExchange64\(&_this->bAllowEmbeddedNavigation, TRUE\)[\s\S]*?NavigateToString/
@@ -347,8 +378,14 @@ for (const text of [
   'add_WebResourceRequested',
   'ep_weather_theme_dark',
   'ep_weather_theme_light',
+  'ep_weather_theme_system',
+  'ep_weather_theme_mode|%s',
   'PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME',
-  'epw_Weather_SetDarkMode(_this, wParam ? 2 : 1, FALSE)',
+  'epw_Weather_SetDarkMode(_this, mode, FALSE)',
+  'InterlockedExchange64(&_this->g_darkModeEnabled, dwDarkMode)',
+  'dwDarkMode < EP_WEATHER_THEME_SYSTEM || dwDarkMode > EP_WEATHER_THEME_DARK',
+  'EP_WEATHER_WM_SYNC_THEME',
+  'EP_WEATHER_THEME_SYSTEM',
   'EP_WEATHER_WM_SET_NATIVE_THEME',
   'epw_Weather_ApplyNativeThemeColors',
   'DWMWA_CAPTION_COLOR',

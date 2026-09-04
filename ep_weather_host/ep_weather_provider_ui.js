@@ -131,8 +131,13 @@ function labels() {
     refreshDeferred: '\u8bf7\u7a0d\u540e\u91cd\u8bd5',
     refreshFailed: '\u5237\u65b0\u5931\u8d25',
     monitoring: '\u5b9e\u65f6\u76d1\u6d4b',
+    theme: '\u914d\u8272\u6a21\u5f0f',
+    themeSystem: '\u8ddf\u968f\u7cfb\u7edf',
+    themeLight: '\u4eae\u8272\u6a21\u5f0f',
+    themeDark: '\u6697\u8272\u6a21\u5f0f',
     switchToDark: '\u5207\u6362\u5230\u6df1\u8272\u6a21\u5f0f',
     switchToLight: '\u5207\u6362\u5230\u6d45\u8272\u6a21\u5f0f',
+    switchToSystem: '\u5207\u6362\u5230\u8ddf\u968f\u7cfb\u7edf',
     feelsClose: '\u4f53\u611f\u63a5\u8fd1',
     feelsWarm: '\u4f53\u611f\u504f\u6696',
     feelsCool: '\u4f53\u611f\u504f\u51c9',
@@ -205,8 +210,13 @@ function labels() {
     refreshDeferred: 'Try again later',
     refreshFailed: 'Refresh failed',
     monitoring: 'Live monitoring',
+    theme: 'Color mode',
+    themeSystem: 'Follow system',
+    themeLight: 'Light mode',
+    themeDark: 'Dark mode',
     switchToDark: 'Switch to dark mode',
     switchToLight: 'Switch to light mode',
+    switchToSystem: 'Switch to follow system',
     feelsClose: 'Feels close to current',
     feelsWarm: 'Feels warmer',
     feelsCool: 'Feels cooler',
@@ -458,27 +468,39 @@ function renderProviderState() {
   }
 }
 
+function weatherThemeMode() {
+  return normalizeWeatherThemeMode(document.documentElement.getAttribute('data-theme'));
+}
+
 function effectiveTheme() {
-  const explicit = document.documentElement.getAttribute('data-theme');
-  if (explicit === 'dark' || explicit === 'light') return explicit;
-  try {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  } catch (error) {
-    return 'light';
-  }
+  const mode = weatherThemeMode();
+  return mode === WEATHER_THEME_SYSTEM
+    ? (weatherSystemPrefersDark() ? WEATHER_THEME_DARK : WEATHER_THEME_LIGHT)
+    : mode;
 }
 
 function updateThemeControl() {
   if (!elements.themeButton) return;
-  const dark = effectiveTheme() === 'dark';
+  const mode = weatherThemeMode();
   const value = labels();
-  const label = dark ? value.switchToLight : value.switchToDark;
+  const next = nextWeatherThemeMode(mode);
+  const modeLabel = mode === WEATHER_THEME_SYSTEM
+    ? value.themeSystem
+    : mode === WEATHER_THEME_DARK ? value.themeDark : value.themeLight;
+  const nextLabel = next === WEATHER_THEME_SYSTEM
+    ? value.switchToSystem
+    : next === WEATHER_THEME_DARK ? value.switchToDark : value.switchToLight;
   const icon = elements.themeButton.querySelector('.control-icon');
-  if (icon) icon.textContent = dark ? '\u2600' : '\u263e';
-  elements.themeButton.dataset.themeMode = dark ? 'dark' : 'light';
+  if (icon) {
+    icon.textContent = mode === WEATHER_THEME_SYSTEM
+      ? '\u25d0'
+      : mode === WEATHER_THEME_DARK ? '\u263e' : '\u2600';
+  }
+  elements.themeButton.dataset.themeMode = mode;
+  const label = `${value.theme}: ${modeLabel}; ${nextLabel}`;
   elements.themeButton.title = label;
   elements.themeButton.setAttribute('aria-label', label);
-  elements.themeButton.setAttribute('aria-pressed', dark ? 'true' : 'false');
+  elements.themeButton.removeAttribute('aria-pressed');
 }
 
 function updateRefreshControl() {
@@ -540,20 +562,62 @@ function renderUpdateStatus(current) {
 function notifyNativeTheme(theme) {
   try {
     if (window.chrome && window.chrome.webview) {
-      window.chrome.webview.postMessage(theme === 'dark'
+      const mode = normalizeWeatherThemeMode(theme);
+      window.chrome.webview.postMessage(mode === WEATHER_THEME_DARK
         ? 'ep_weather_theme_dark'
-        : 'ep_weather_theme_light');
+        : mode === WEATHER_THEME_LIGHT
+          ? 'ep_weather_theme_light'
+          : 'ep_weather_theme_system');
     }
   } catch (error) {
     // Standalone previews do not provide the native WebView host.
   }
 }
 
-function toggleTheme() {
-  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
+function setThemeMode(mode, notifyNative = true) {
+  const normalized = normalizeWeatherThemeMode(mode);
+  if (normalized === WEATHER_THEME_SYSTEM) {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', normalized);
+  }
   updateThemeControl();
-  notifyNativeTheme(next);
+  if (notifyNative) notifyNativeTheme(normalized);
+  if (typeof scheduleRenderAndCapture === 'function') scheduleRenderAndCapture(true);
+}
+
+function toggleTheme() {
+  setThemeMode(nextWeatherThemeMode(weatherThemeMode()));
+}
+
+function handleNativeThemeModeMessage(event) {
+  const message = textValue(event && event.data);
+  const prefix = 'ep_weather_theme_mode|';
+  if (!message.startsWith(prefix)) return;
+  const mode = message.slice(prefix.length);
+  if (mode === WEATHER_THEME_SYSTEM || mode === WEATHER_THEME_LIGHT || mode === WEATHER_THEME_DARK) {
+    setThemeMode(mode, false);
+  }
+}
+
+function initializeThemeControl() {
+  updateThemeControl();
+  try {
+    const webview = window.chrome && window.chrome.webview;
+    if (webview && typeof webview.addEventListener === 'function') {
+      webview.addEventListener('message', handleNativeThemeModeMessage);
+    }
+  } catch (error) {
+    // Standalone previews do not provide the native WebView host.
+  }
+  if (window.matchMedia) {
+    const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');
+    const updateForSystem = () => {
+      if (weatherThemeMode() === WEATHER_THEME_SYSTEM) updateThemeControl();
+    };
+    if (typeof colorScheme.addEventListener === 'function') colorScheme.addEventListener('change', updateForSystem);
+    else if (typeof colorScheme.addListener === 'function') colorScheme.addListener(updateForSystem);
+  }
 }
 
 async function refreshWeatherNow() {
@@ -1270,9 +1334,13 @@ if (window.__epWeatherTestMode) {
     weatherIconFontReady: () => weatherIconFontLoaded,
     renderWeather,
     refreshWeatherNow,
-    toggleTheme
+    toggleTheme,
+    setThemeMode,
+    weatherThemeMode,
+    effectiveTheme
   });
 }
 
 setLoading();
+initializeThemeControl();
 initializeWeatherIconFont();

@@ -225,6 +225,27 @@ static void epw_Weather_ApplyNativeThemeColors(EPWeather* _this, BOOL dark)
     DwmSetWindowAttribute(_this->hWnd, DWMWA_BORDER_COLOR, &border, sizeof(border));
 }
 
+static HRESULT epw_Weather_PostThemeMode(EPWeather* _this)
+{
+    if (!_this || !_this->pCoreWebView2)
+    {
+        return E_INVALIDARG;
+    }
+
+    LONG64 mode = InterlockedAdd64(&_this->g_darkModeEnabled, 0);
+    LPCWSTR modeName = mode == EP_WEATHER_THEME_DARK ? L"dark" :
+        mode == EP_WEATHER_THEME_LIGHT ? L"light" : L"system";
+    WCHAR message[64];
+    if (swprintf_s(message, ARRAYSIZE(message), L"ep_weather_theme_mode|%s", modeName) < 0)
+    {
+        return E_FAIL;
+    }
+    return _this->pCoreWebView2->lpVtbl->PostWebMessageAsString(
+        _this->pCoreWebView2,
+        message
+    );
+}
+
 static HRESULT epw_Weather_NavigateToString(EPWeather* _this, LPCWSTR htmlContent)
 {
     if (!_this || !_this->pCoreWebView2 || !htmlContent)
@@ -1529,11 +1550,15 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
         {
             // Apply the page-selected theme on the window thread so the native
             // caption/backdrop stays in sync with the embedded document.
-            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME, TRUE, 0);
+            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME, EP_WEATHER_THEME_DARK, 0);
         }
         else if (!_wcsicmp(message, L"ep_weather_theme_light"))
         {
-            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME, FALSE, 0);
+            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME, EP_WEATHER_THEME_LIGHT, 0);
+        }
+        else if (!_wcsicmp(message, L"ep_weather_theme_system"))
+        {
+            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_NATIVE_THEME, EP_WEATHER_THEME_SYSTEM, 0);
         }
         else if (!_wcsicmp(message, L"ep_weather_updated") &&
             InterlockedCompareExchange64(&_this->bDataCapturePending, TRUE, FALSE) == FALSE)
@@ -1618,6 +1643,7 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_NavigationCompleted(GenericObjectWithThi
         }
         else
         {
+            epw_Weather_PostThemeMode(_this);
             //_epw_Weather_ExecuteDataScript(_this);
             SetTimer(_this->hWnd, EP_WEATHER_TIMER_EXECUTEDATASCRIPT, EP_WEATHER_TIMER_EXECUTEDATASCRIPT_DELAY, NULL);
         }
@@ -2183,7 +2209,17 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
     {
         // The page owns the visual theme, while the native window owns its
         // non-client caption and backdrop. Keep both layers synchronized.
-        epw_Weather_SetDarkMode(_this, wParam ? 2 : 1, FALSE);
+        LONG64 mode = (LONG64)wParam;
+        if (mode < EP_WEATHER_THEME_SYSTEM || mode > EP_WEATHER_THEME_DARK)
+        {
+            mode = EP_WEATHER_THEME_SYSTEM;
+        }
+        epw_Weather_SetDarkMode(_this, mode, FALSE);
+        return 0;
+    }
+    else if (uMsg == EP_WEATHER_WM_SYNC_THEME)
+    {
+        epw_Weather_PostThemeMode(_this);
         return 0;
     }
     else if (uMsg == EP_WEATHER_WM_SET_BROWSER_THEME)
@@ -2438,24 +2474,30 @@ HRESULT STDMETHODCALLTYPE epw_Weather_IsDarkMode(EPWeather* _this, LONG64 dwDark
 {
     BOOL bIsCompositionEnabled = TRUE;
     DwmIsCompositionEnabled(&bIsCompositionEnabled);
-    if (!dwDarkMode)
+    if (dwDarkMode == EP_WEATHER_THEME_SYSTEM)
     {
         RTL_OSVERSIONINFOW rovi;
         *bEnabled = bIsCompositionEnabled && ((global_rovi.dwBuildNumber < 18985) ? TRUE : (ShouldSystemUseDarkMode ? ShouldSystemUseDarkMode() : FALSE)) && !IsHighContrast();
     }
     else
     {
-        *bEnabled = dwDarkMode - 1;
+        *bEnabled = dwDarkMode - EP_WEATHER_THEME_LIGHT;
     }
     return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE epw_Weather_SetDarkMode(EPWeather* _this, LONG64 dwDarkMode, LONG64 bRefresh)
 {
+    if (dwDarkMode < EP_WEATHER_THEME_SYSTEM || dwDarkMode > EP_WEATHER_THEME_DARK)
+    {
+        return E_INVALIDARG;
+    }
     LONG64 bEnabled;
     epw_Weather_IsDarkMode(_this, dwDarkMode, &bEnabled);
     InterlockedExchange64(&_this->g_darkModeEnabled, dwDarkMode);
-    if ((dwDarkMode == 2 && bEnabled) || (dwDarkMode == 1 && !bEnabled) || !dwDarkMode)
+    if ((dwDarkMode == EP_WEATHER_THEME_DARK && bEnabled) ||
+        (dwDarkMode == EP_WEATHER_THEME_LIGHT && !bEnabled) ||
+        dwDarkMode == EP_WEATHER_THEME_SYSTEM)
     {
         RefreshImmersiveColorPolicyState();
         if (_this->hWnd)
@@ -2470,6 +2512,13 @@ HRESULT STDMETHODCALLTYPE epw_Weather_SetDarkMode(EPWeather* _this, LONG64 dwDar
             epw_Weather_ApplyNativeThemeColors(_this, (BOOL)bEnabled);
             //InvalidateRect(_this->hWnd, NULL, FALSE);
             PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_BROWSER_THEME, bEnabled, bRefresh);
+            if (bRefresh)
+            {
+                // Settings changes originate outside the WebView thread. Send
+                // the selected mode back after the browser media override so
+                // the document's data-theme attribute cannot become stale.
+                PostMessageW(_this->hWnd, EP_WEATHER_WM_SYNC_THEME, 0, 0);
+            }
         }
         return S_OK;
     }
@@ -2809,6 +2858,12 @@ HRESULT STDMETHODCALLTYPE epw_Weather_Initialize(EPWeather* _this, WCHAR wszName
         return E_INVALIDARG;
     }
     InterlockedExchange64(&_this->dwProvider, dwProvider);
+
+    if (dwDarkMode < EP_WEATHER_THEME_SYSTEM || dwDarkMode > EP_WEATHER_THEME_DARK)
+    {
+        return E_INVALIDARG;
+    }
+    InterlockedExchange64(&_this->g_darkModeEnabled, dwDarkMode);
 
     if (!cbx || !cby)
     {
