@@ -464,7 +464,13 @@ for (const text of ['CryptProtectData', 'CryptUnprotectData', 'REG_BINARY', '.qw
   if (!configSource.includes(text)) throw new Error(`Missing credential protection: ${text}`);
 }
 for (const settingsPath of settingsPaths) {
-  const settings = fs.readFileSync(settingsPath, 'utf8');
+  const settingsBytes = fs.readFileSync(settingsPath);
+  for (let index = 0; index < settingsBytes.length; ++index) {
+    if (settingsBytes[index] === 0x0a && (index === 0 || settingsBytes[index - 1] !== 0x0d)) {
+      throw new Error(`GUI settings resource must use CRLF line endings: ${settingsPath}`);
+    }
+  }
+  const settings = settingsBytes.toString('utf8');
   if (settings.includes('WeatherQWeatherApiKeyProtected') || settings.includes('WeatherQWeatherApiHost')) {
     throw new Error('QWeather credentials must not be included in settings export templates.');
   }
