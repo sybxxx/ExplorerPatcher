@@ -156,12 +156,13 @@ static HRESULT epw_Weather_PostAutoLocationResult(
     int written = swprintf_s(
         message,
         ARRAYSIZE(message),
-        L"ep_weather_location_result|%s|{\"ok\":%s,\"latitude\":%.8f,\"longitude\":%.8f,\"accuracyMeters\":%.2f,\"city\":",
+        L"ep_weather_location_result|%s|{\"ok\":%s,\"latitude\":%.8f,\"longitude\":%.8f,\"accuracyMeters\":%.2f,\"positionSource\":%ld,\"city\":",
         result->requestId,
         result->success ? L"true" : L"false",
         result->latitude,
         result->longitude,
-        result->accuracyMeters
+        result->accuracyMeters,
+        result->positionSource
     );
     if (written < 0)
     {

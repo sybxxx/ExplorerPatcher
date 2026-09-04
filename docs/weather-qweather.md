@@ -21,18 +21,21 @@ treated as an explicit city, district, or postal-code query and is never
 replaced by automatic detection.
 
 When the field is empty, the default **Windows precise location** mode asks the
-Windows Location service for a coordinate through the native Location API. It
-requests high accuracy and accepts a report only when Windows supplies a
-positive error radius no larger than 50 km. The coordinate is then passed to
-QWeather's city lookup to obtain the displayed city or district. This request
-does not use the WebView2 page, Google, or the `127.0.0.1:10808` proxy.
+Windows Location service for a coordinate through the modern native
+`Geolocator` API. It requests high accuracy and accepts a report only when
+Windows identifies Wi-Fi, satellite, or cellular positioning and supplies a
+positive error radius no larger than 50 km. A report identified as
+`PositionSource_IPAddress` is rejected even if its reported radius looks small,
+because it is still an IP approximation. The accepted coordinate is then
+passed to QWeather's city lookup to obtain the displayed city or district. This
+request does not use the WebView2 page, Google, or the `127.0.0.1:10808` proxy.
 
-If Windows has no usable Wi-Fi, GPS, cellular, or other location report, the
-widget stops with a clear request for a manual location. It does not silently
-fall back to an IP-derived city, so a wired-only computer will not suddenly
-inherit a wrong city from the proxy or a coarse network database. A Windows
-location report is still subject to the accuracy reported by the operating
-system; it is not a guarantee of street-level accuracy.
+If Windows has no usable Wi-Fi, GPS, cellular, or other precise location
+report, the widget stops with a clear request for a manual location. It does
+not silently fall back to an IP-derived city, so a wired-only computer will not
+suddenly inherit a wrong city from the proxy or a coarse network database. A
+Windows location report is still subject to the accuracy reported by the
+operating system; it is not a guarantee of street-level accuracy.
 
 The optional **Direct IP approximate location** mode makes one bounded request
 to `https://ipwho.is/` with WinInet's `INTERNET_OPEN_TYPE_DIRECT` mode. It is
@@ -47,7 +50,7 @@ The provider uses these endpoints:
 
 | Dataset | Endpoint | Refresh interval |
 | --- | --- | ---: |
-| Location | Windows Location service, then `/geo/v2/city/lookup` when configured | Once per page lifecycle |
+| Location | Windows `Geolocator`, then `/geo/v2/city/lookup` when configured | Once per page lifecycle |
 | Current conditions | `/weather/v1/current/{lat}/{lon}` | 10 minutes |
 | 24 hourly forecasts | `/weather/v1/hourly/{lat}/{lon}` | 60 minutes |
 | 5 daily forecasts | `/weather/v1/daily/{lat}/{lon}` | 3 hours |

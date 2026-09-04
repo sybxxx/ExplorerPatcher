@@ -73,10 +73,14 @@ function labels() {
     loading: '\u52a0\u8f7d\u4e2d...',
     error: '\u65e0\u6cd5\u83b7\u53d6\u5929\u6c14',
     windowsLocation: '\u6b63\u5728\u4f7f\u7528 Windows \u5b9a\u4f4d...',
+    windowsLocationUnavailable: 'Windows \u5b9a\u4f4d\u4e0d\u53ef\u7528',
     windowsLocationError: 'Windows \u65e0\u6cd5\u63d0\u4f9b\u53ef\u9760\u4f4d\u7f6e\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
+    windowsIpLocationError: 'Windows \u4ec5\u8fd4\u56de IP \u8fd1\u4f3c\u4f4d\u7f6e\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
     directIpLocation: '\u6b63\u5728\u4f7f\u7528\u76f4\u8fde IP \u8fd1\u4f3c\u5b9a\u4f4d...',
+    directIpUnavailable: '\u76f4\u8fde IP \u8fd1\u4f3c\u5b9a\u4f4d\u4e0d\u53ef\u7528',
     directIpError: '\u76f4\u8fde IP \u8fd1\u4f3c\u5b9a\u4f4d\u5931\u8d25\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
     manualLocationError: '\u8bf7\u8f93\u5165\u5730\u70b9',
+    manualLocationTitle: '\u8bf7\u8f93\u5165\u5929\u6c14\u5730\u70b9',
     windowsLocationSource: 'Windows \u5b9a\u4f4d',
     directIpSource: '\u76f4\u8fde IP \u8fd1\u4f3c',
     feels: '\u4f53\u611f\u6e29\u5ea6',
@@ -139,10 +143,14 @@ function labels() {
     loading: 'Loading...',
     error: 'Unable to load weather',
     windowsLocation: 'Locating with Windows location services...',
+    windowsLocationUnavailable: 'Windows location unavailable',
     windowsLocationError: 'Windows could not provide a reliable location; enter one manually',
+    windowsIpLocationError: 'Windows returned only an IP approximation; enter one manually',
     directIpLocation: 'Locating through a direct IP connection...',
+    directIpUnavailable: 'Direct IP approximate location unavailable',
     directIpError: 'Direct IP location failed; enter a location manually',
     manualLocationError: 'Enter a location',
+    manualLocationTitle: 'Enter a weather location',
     windowsLocationSource: 'Windows location',
     directIpSource: 'Direct IP approximate',
     feels: 'Feels like',
@@ -348,7 +356,15 @@ function automaticLocationErrorLabel() {
   const value = labels();
   if (state.locationMode === LOCATION_MODE_DIRECT_IP) return value.directIpError;
   if (state.locationMode === LOCATION_MODE_MANUAL) return value.manualLocationError;
+  if (state.errors.initialization === 'Windows location returned IP source') return value.windowsIpLocationError;
   return value.windowsLocationError;
+}
+
+function automaticLocationErrorTitle() {
+  const value = labels();
+  if (state.locationMode === LOCATION_MODE_DIRECT_IP) return value.directIpUnavailable;
+  if (state.locationMode === LOCATION_MODE_MANUAL) return value.manualLocationTitle;
+  return value.windowsLocationUnavailable;
 }
 
 function setLoading() {
@@ -405,6 +421,7 @@ function setLoading() {
 function setError() {
   setLoading();
   const value = labels();
+  if (!state.location) elements.location.textContent = automaticLocationErrorTitle();
   elements.condition.textContent = state.location ? value.error : automaticLocationErrorLabel();
   elements.providerState.textContent = state.apiHost ? labels().fallback : 'Open-Meteo';
   elements.providerState.classList.add('warning');

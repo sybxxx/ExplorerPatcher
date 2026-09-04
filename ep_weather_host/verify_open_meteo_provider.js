@@ -100,6 +100,9 @@ for (const text of [
   'ep_weather_auto_location_error|',
   'ep_weather_location_result|',
   'ep_weather_location_error|',
+  'positionSource',
+  'Windows location returned IP source',
+  'windowsIpLocationError',
   'MANUAL_REFRESH_COOLDOWN',
   'refreshWeatherNow',
   'hero-range',
@@ -268,18 +271,24 @@ assert.throws(
 const windowsLocation = normalizers.normalizeWindowsLocation({
   latitude: 26.89,
   longitude: 112.57,
-  accuracyMeters: 35
+  accuracyMeters: 35,
+  positionSource: 2
 });
 assert.strictEqual(windowsLocation.lat, 26.89);
 assert.strictEqual(windowsLocation.lon, 112.57);
 assert.strictEqual(windowsLocation.accuracyMeters, 35);
+assert.strictEqual(windowsLocation.positionSource, 2);
 assert.strictEqual(windowsLocation.source, 'Windows Location');
 assert.throws(
-  () => normalizers.normalizeWindowsLocation({ latitude: 26.89, longitude: 112.57, accuracyMeters: 50001 }),
+  () => normalizers.normalizeWindowsLocation({ latitude: 26.89, longitude: 112.57, accuracyMeters: 50001, positionSource: 2 }),
   /Windows location is not accurate enough/
 );
 assert.throws(
-  () => normalizers.normalizeWindowsLocation({ latitude: 26.89, longitude: 112.57 }),
+  () => normalizers.normalizeWindowsLocation({ latitude: 26.89, longitude: 112.57, accuracyMeters: 35 }),
+  /Windows location is not accurate enough/
+);
+assert.throws(
+  () => normalizers.normalizeWindowsLocation({ latitude: 26.89, longitude: 112.57, accuracyMeters: 35, positionSource: 3 }),
   /Windows location is not accurate enough/
 );
 
@@ -342,9 +351,11 @@ for (const text of [
   }
 }
 for (const text of [
-  'CLSID_Location',
-  'SetDesiredAccuracy',
-  'REPORT_NOT_SUPPORTED',
+  'RuntimeClass_Windows_Devices_Geolocation_Geolocator',
+  'GetGeopositionAsyncWithAgeAndTimeout',
+  'IGeocoordinateWithPositionData',
+  'PositionSource_IPAddress',
+  'PositionSource_WiFi',
   'EPWeather_BeginWindowsLocation',
   'accuracyMeters'
 ]) {
@@ -353,6 +364,7 @@ for (const text of [
   }
 }
 assert.ok(!locationSource.includes('DirectLocationRequest'), 'The location worker should be shared by both native modes');
+assert.ok(!locationSource.includes('CLSID_Location'), 'The deprecated Location API must not be the primary native provider');
 assert.ok(!locationSource.includes('INTERNET_OPEN_TYPE_PRECONFIG'), 'Direct IP lookup must not use the system proxy');
 
 async function verifyNativeLocationModes(source) {
@@ -387,7 +399,8 @@ async function verifyNativeLocationModes(source) {
         ok: true,
         latitude: 26.89,
         longitude: 112.57,
-        accuracyMeters: isWindows ? nextWindowsAccuracy : 0
+        accuracyMeters: isWindows ? nextWindowsAccuracy : 0,
+        positionSource: isWindows ? 2 : 3
       });
       for (const listener of nativeMessageListeners) {
         listener({ data: `ep_weather_location_result|${requestId}|${payload}` });

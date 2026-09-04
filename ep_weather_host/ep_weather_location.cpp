@@ -1,9 +1,7 @@
 #include "ep_weather_location.h"
 
-#pragma warning(push)
-#pragma warning(disable: 4996)
-#include <LocationApi.h>
-#pragma warning(pop)
+#include <windows.devices.geolocation.h>
+#include <windows.foundation.h>
 #include <windows.data.json.h>
 #include <roapi.h>
 #include <strsafe.h>
@@ -17,16 +15,20 @@
 
 #pragma comment(lib, "runtimeobject.lib")
 #pragma comment(lib, "Wininet.lib")
-#pragma comment(lib, "locationapi.lib")
 
 using Microsoft::WRL::ComPtr;
 using Microsoft::WRL::Wrappers::HStringReference;
 using namespace ABI::Windows::Data::Json;
+using namespace ABI::Windows::Devices::Geolocation;
+using namespace ABI::Windows::Foundation;
 
 namespace
 {
     constexpr LPCWSTR kDirectLocationUrl = L"https://ipwho.is/";
     constexpr DWORD kDirectLocationTimeout = 6000;
+    constexpr DWORD kWindowsLocationTimeout = 10000;
+    constexpr LONGLONG kWindowsLocationTimeoutTicks =
+        static_cast<LONGLONG>(kWindowsLocationTimeout) * 10000;
     constexpr size_t kResponseLimit = 32 * 1024;
 
     struct LocationRequest
@@ -242,6 +244,7 @@ namespace
         result->latitude = latitude;
         result->longitude = longitude;
         result->accuracyMeters = 0;
+        result->positionSource = EP_WEATHER_LOCATION_SOURCE_IP;
         CopyJsonString(object.Get(), L"city", result->city, ARRAYSIZE(result->city));
         CopyJsonString(object.Get(), L"region", result->region, ARRAYSIZE(result->region));
         CopyJsonString(object.Get(), L"country", result->country, ARRAYSIZE(result->country));
@@ -261,79 +264,144 @@ namespace
             return roInitialize;
         }
 
-        ComPtr<ILocation> location;
-        HRESULT hr = CoCreateInstance(
-            CLSID_Location,
-            nullptr,
-            CLSCTX_INPROC_SERVER,
-            IID_PPV_ARGS(&location)
+        ComPtr<IInspectable> inspectable;
+        HRESULT hr = RoActivateInstance(
+            HStringReference(RuntimeClass_Windows_Devices_Geolocation_Geolocator).Get(),
+            &inspectable
         );
-        if (FAILED(hr) || !location)
+        if (FAILED(hr) || !inspectable)
         {
             return FAILED(hr) ? hr : E_FAIL;
         }
 
-        hr = location->SetDesiredAccuracy(IID_ILatLongReport, LOCATION_DESIRED_ACCURACY_HIGH);
+        ComPtr<IGeolocator> locator;
+        hr = inspectable.As(&locator);
+        if (FAILED(hr) || !locator)
+        {
+            return FAILED(hr) ? hr : E_FAIL;
+        }
+
+        hr = locator->put_DesiredAccuracy(PositionAccuracy_High);
         if (FAILED(hr))
         {
             return hr;
         }
-        location->SetReportInterval(IID_ILatLongReport, 1000);
-
-        LOCATION_REPORT_STATUS status = REPORT_NOT_SUPPORTED;
-        const DWORD start = GetTickCount();
-        while (GetTickCount() - start < 10000)
+        hr = locator->put_ReportInterval(1000);
+        if (FAILED(hr))
         {
-            hr = location->GetReportStatus(IID_ILatLongReport, &status);
+            return hr;
+        }
+
+        __FIAsyncOperation_1_Windows__CDevices__CGeolocation__CGeoposition* operationRaw = nullptr;
+        hr = locator->GetGeopositionAsyncWithAgeAndTimeout(
+            TimeSpan{ 0 },
+            TimeSpan{ kWindowsLocationTimeoutTicks },
+            &operationRaw
+        );
+        if (FAILED(hr) || !operationRaw)
+        {
+            return FAILED(hr) ? hr : E_FAIL;
+        }
+
+        ComPtr<__FIAsyncOperation_1_Windows__CDevices__CGeolocation__CGeoposition> operation;
+        operation.Attach(operationRaw);
+        ComPtr<IAsyncInfo> asyncInfo;
+        hr = operation.As(&asyncInfo);
+        if (FAILED(hr) || !asyncInfo)
+        {
+            return FAILED(hr) ? hr : E_FAIL;
+        }
+
+        AsyncStatus status = Started;
+        const DWORD start = GetTickCount();
+        while (GetTickCount() - start < kWindowsLocationTimeout)
+        {
+            hr = asyncInfo->get_Status(&status);
             if (FAILED(hr))
             {
                 return hr;
             }
-            if (status == REPORT_ACCESS_DENIED)
+            if (status != Started)
             {
-                return E_ACCESSDENIED;
+                break;
             }
-            if (status == REPORT_NOT_SUPPORTED)
-            {
-                return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-            }
-            if (status == REPORT_ERROR)
-            {
-                return E_FAIL;
-            }
-            if (status == REPORT_RUNNING)
-            {
-                ComPtr<ILocationReport> baseReport;
-                if (SUCCEEDED(location->GetReport(IID_ILatLongReport, &baseReport)) && baseReport)
-                {
-                    ComPtr<ILatLongReport> report;
-                    if (SUCCEEDED(baseReport.As(&report)) && report)
-                    {
-                        double latitude = 0;
-                        double longitude = 0;
-                        double accuracy = 0;
-                        if (SUCCEEDED(report->GetLatitude(&latitude)) &&
-                            SUCCEEDED(report->GetLongitude(&longitude)) &&
-                            SUCCEEDED(report->GetErrorRadius(&accuracy)) &&
-                            std::isfinite(latitude) && std::isfinite(longitude) &&
-                            std::isfinite(accuracy) && accuracy > 0 &&
-                            accuracy <= EP_WEATHER_LOCATION_MAX_ACCURACY_METERS &&
-                            latitude >= -90.0 && latitude <= 90.0 &&
-                            longitude >= -180.0 && longitude <= 180.0)
-                        {
-                            result->success = TRUE;
-                            result->status = S_OK;
-                            result->latitude = latitude;
-                            result->longitude = longitude;
-                            result->accuracyMeters = accuracy;
-                            return S_OK;
-                        }
-                    }
-                }
-            }
-            Sleep(250);
+            Sleep(100);
         }
-        return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+        if (status == Started)
+        {
+            asyncInfo->Cancel();
+            return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+        }
+        if (status != Completed)
+        {
+            HRESULT error = E_FAIL;
+            if (SUCCEEDED(asyncInfo->get_ErrorCode(&error)) && FAILED(error))
+            {
+                return error;
+            }
+            return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+        }
+
+        ComPtr<IGeoposition> position;
+        hr = operation->GetResults(&position);
+        if (FAILED(hr) || !position)
+        {
+            return FAILED(hr) ? hr : E_FAIL;
+        }
+
+        ComPtr<IGeocoordinate> coordinate;
+        hr = position->get_Coordinate(&coordinate);
+        if (FAILED(hr) || !coordinate)
+        {
+            return FAILED(hr) ? hr : E_FAIL;
+        }
+
+        ComPtr<IGeocoordinateWithPositionData> positionData;
+        PositionSource positionSource = static_cast<PositionSource>(-1);
+        if (FAILED(coordinate.As(&positionData)) || !positionData ||
+            FAILED(positionData->get_PositionSource(&positionSource)))
+        {
+            return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+        }
+        result->positionSource = static_cast<LONG>(positionSource);
+
+        // PositionSource_IPAddress is intentionally rejected. It is still an
+        // IP approximation, even when the result came through Windows APIs.
+        if (positionSource != PositionSource_Cellular &&
+            positionSource != PositionSource_Satellite &&
+            positionSource != PositionSource_WiFi)
+        {
+            return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+        }
+
+        ComPtr<IGeocoordinateWithPoint> coordinateWithPoint;
+        ComPtr<IGeopoint> point;
+        BasicGeoposition basicPosition = {};
+        double accuracy = 0;
+        if (FAILED(coordinate.As(&coordinateWithPoint)) || !coordinateWithPoint ||
+            FAILED(coordinateWithPoint->get_Point(&point)) || !point ||
+            FAILED(point->get_Position(&basicPosition)) ||
+            FAILED(coordinate->get_Accuracy(&accuracy)))
+        {
+            return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+        }
+
+        if (!std::isfinite(basicPosition.Latitude) ||
+            !std::isfinite(basicPosition.Longitude) ||
+            !std::isfinite(accuracy) || accuracy <= 0 ||
+            accuracy > EP_WEATHER_LOCATION_MAX_ACCURACY_METERS ||
+            basicPosition.Latitude < -90.0 || basicPosition.Latitude > 90.0 ||
+            basicPosition.Longitude < -180.0 || basicPosition.Longitude > 180.0)
+        {
+            return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+        }
+
+        result->success = TRUE;
+        result->status = S_OK;
+        result->latitude = basicPosition.Latitude;
+        result->longitude = basicPosition.Longitude;
+        result->accuracyMeters = accuracy;
+        return S_OK;
     }
 
     DWORD WINAPI LocationWorker(void* parameter)
@@ -351,6 +419,7 @@ namespace
         {
             ZeroMemory(result, sizeof(*result));
             result->browserGeneration = request->browserGeneration;
+            result->positionSource = -1;
             StringCchCopyW(result->requestId, ARRAYSIZE(result->requestId), request->requestId);
 
             HRESULT hr = E_FAIL;

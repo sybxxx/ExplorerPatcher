@@ -211,7 +211,14 @@ function handleNativeWeatherMessage(event) {
   }
   try {
     const payload = JSON.parse(message.slice(separator + 1));
-    if (!payload || payload.ok !== true) throw new Error('Native location unavailable');
+    if (!payload || payload.ok !== true) {
+      waiter.reject(new Error(
+        Number(payload && payload.positionSource) === 3
+          ? 'Windows location returned IP source'
+          : 'Native location unavailable'
+      ));
+      return true;
+    }
     waiter.resolve(payload);
   } catch (error) {
     waiter.reject(new Error('Invalid native location response'));
@@ -281,9 +288,10 @@ function normalizeWindowsLocation(raw) {
   const latitude = finiteNumber(raw && raw.latitude);
   const longitude = finiteNumber(raw && raw.longitude);
   const accuracy = finiteNumber(raw && raw.accuracyMeters);
+  const positionSource = finiteNumber(raw && raw.positionSource);
   if (latitude === null || longitude === null || latitude < -90 || latitude > 90 ||
       longitude < -180 || longitude > 180 || accuracy === null || accuracy <= 0 ||
-      accuracy > LOCATION_MAX_ACCURACY_METERS) {
+      accuracy > LOCATION_MAX_ACCURACY_METERS || ![0, 1, 2].includes(positionSource)) {
     throw new Error('Windows location is not accurate enough');
   }
   return {
@@ -294,6 +302,7 @@ function normalizeWindowsLocation(raw) {
     province: '',
     country: '',
     accuracyMeters: accuracy,
+    positionSource,
     source: 'Windows Location'
   };
 }
@@ -305,6 +314,7 @@ async function refineLocationWithQWeather(place, generation) {
       return {
         ...resolved,
         accuracyMeters: place.accuracyMeters,
+        positionSource: place.positionSource,
         source: `${place.source} + QWeather`
       };
     } catch (error) {

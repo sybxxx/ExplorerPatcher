@@ -52,7 +52,7 @@ const mockBootstrap = String.raw`<script>
       const prefix = isWindowsLocation ? windowsLocationPrefix : directIpLocationPrefix;
       const requestId = message.slice(prefix.length);
       setTimeout(function() {
-        const payload = JSON.stringify({ ok: true, latitude: 26.89, longitude: 112.57, accuracyMeters: isWindowsLocation ? 35 : 0, city: '\u8861\u9633\u5e02', region: '\u6e56\u5357\u7701', country: '\u4e2d\u56fd' });
+        const payload = JSON.stringify({ ok: true, latitude: 26.89, longitude: 112.57, accuracyMeters: isWindowsLocation ? 35 : 0, positionSource: isWindowsLocation ? 2 : 3, city: '\u8861\u9633\u5e02', region: '\u6e56\u5357\u7701', country: '\u4e2d\u56fd' });
         for (const listener of nativeMessageListeners) listener({ data: 'ep_weather_location_result|' + requestId + '|' + payload });
       }, 10);
     }

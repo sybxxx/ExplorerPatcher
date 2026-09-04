@@ -11,6 +11,10 @@
 #define EP_WEATHER_LOCATION_MODE_DIRECT_IP 2
 #define EP_WEATHER_LOCATION_MODE_MANUAL 3
 #define EP_WEATHER_LOCATION_MAX_ACCURACY_METERS 50000.0
+#define EP_WEATHER_LOCATION_SOURCE_CELLULAR 0
+#define EP_WEATHER_LOCATION_SOURCE_SATELLITE 1
+#define EP_WEATHER_LOCATION_SOURCE_WIFI 2
+#define EP_WEATHER_LOCATION_SOURCE_IP 3
 
 typedef struct _EPWeatherLocationResult
 {
@@ -21,6 +25,7 @@ typedef struct _EPWeatherLocationResult
     double latitude;
     double longitude;
     double accuracyMeters;
+    LONG positionSource;
     WCHAR city[EP_WEATHER_AUTO_LOCATION_TEXT_MAX];
     WCHAR region[EP_WEATHER_AUTO_LOCATION_TEXT_MAX];
     WCHAR country[EP_WEATHER_AUTO_LOCATION_TEXT_MAX];
