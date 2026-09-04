@@ -265,8 +265,8 @@ BEGIN
 
     IDS_WEATHER_SHOW            "Show Weather on the taskbar"
     IDS_WEATHER_LOC             "Location"
-    IDS_WEATHER_LOC_PROMPT      "Enter a city, district, or postal code for weather information. Leave this blank to locate the weather using a direct IP connection that bypasses the system proxy."
-    IDS_WEATHER_LOC_DEFAULT     "Automatic location (direct IP)"
+    IDS_WEATHER_LOC_PROMPT      "Enter a city, district, or postal code for weather information. Leave this blank to use Windows precise location. If Windows has no reliable location source, enter a location manually or select an approximate IP source below."
+    IDS_WEATHER_LOC_DEFAULT     "Automatic location (Windows precise)"
     IDS_WEATHER_LAYOUT          "Layout"
     IDS_WEATHER_LAYOUT_0        "Icon and description (default)"
     IDS_WEATHER_LAYOUT_3        "Icon and temperature"
@@ -334,6 +334,10 @@ BEGIN
     IDS_WEATHER_QWEATHER_CLEAR_PROMPT "Remove the protected QWeather API Host and API Key from this Windows account?"
     IDS_WEATHER_QWEATHER_CLEARED "The QWeather configuration has been removed. Open-Meteo fallback will be used."
     IDS_WEATHER_QWEATHER_CLEAR_FAILED "ExplorerPatcher could not remove the QWeather configuration."
+    IDS_WEATHER_LOCATION_MODE   "Automatic location source"
+    IDS_WEATHER_LOCATION_MODE_0 "Windows precise location (default)"
+    IDS_WEATHER_LOCATION_MODE_2 "Direct IP approximate location"
+    IDS_WEATHER_LOCATION_MODE_3 "Manual location only"
 
     IDS_SP                      "Spotlight"
 

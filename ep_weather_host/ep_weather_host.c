@@ -26,7 +26,7 @@ static HRESULT epw_Weather_NavigateToString(EPWeather* _this, LPCWSTR htmlConten
 static void epw_Weather_ApplyNativeThemeColors(EPWeather* _this, BOOL dark);
 static void epw_Weather_ResetAutoLocationRequest(EPWeather* _this);
 static HRESULT epw_Weather_PostAutoLocationError(EPWeather* _this, LPCWSTR requestId);
-static HRESULT epw_Weather_PostAutoLocationResult(EPWeather* _this, EPWeatherDirectLocationResult* result);
+static HRESULT epw_Weather_PostAutoLocationResult(EPWeather* _this, EPWeatherLocationResult* result);
 
 static BOOL epw_Weather_AppendWideChar(
     WCHAR* buffer,
@@ -128,7 +128,7 @@ static HRESULT epw_Weather_PostAutoLocationError(EPWeather* _this, LPCWSTR reque
     int written = swprintf_s(
         message,
         ARRAYSIZE(message),
-        L"ep_weather_auto_location_error|%s|direct_lookup_failed",
+        L"ep_weather_location_error|%s|lookup_failed",
         requestId
     );
     if (written < 0)
@@ -143,7 +143,7 @@ static HRESULT epw_Weather_PostAutoLocationError(EPWeather* _this, LPCWSTR reque
 
 static HRESULT epw_Weather_PostAutoLocationResult(
     EPWeather* _this,
-    EPWeatherDirectLocationResult* result
+    EPWeatherLocationResult* result
 )
 {
     if (!_this || !_this->pCoreWebView2 || !result || !result->requestId[0])
@@ -156,11 +156,12 @@ static HRESULT epw_Weather_PostAutoLocationResult(
     int written = swprintf_s(
         message,
         ARRAYSIZE(message),
-        L"ep_weather_auto_location_result|%s|{\"ok\":%s,\"latitude\":%.8f,\"longitude\":%.8f,\"city\":",
+        L"ep_weather_location_result|%s|{\"ok\":%s,\"latitude\":%.8f,\"longitude\":%.8f,\"accuracyMeters\":%.2f,\"city\":",
         result->requestId,
         result->success ? L"true" : L"false",
         result->latitude,
-        result->longitude
+        result->longitude,
+        result->accuracyMeters
     );
     if (written < 0)
     {
@@ -1114,7 +1115,8 @@ HRESULT STDMETHODCALLTYPE _epw_Weather_ExecuteDataScript(EPWeather* _this)
                     (int)InterlockedAdd64(&_this->dwTemperatureUnit, 0),
                     (int)InterlockedAdd64(&_this->cbx, 0),
                     (int)InterlockedAdd64(&_this->cby, 0),
-                    wszEscapedApiHost
+                    wszEscapedApiHost,
+                    (int)InterlockedAdd64(&_this->dwGeolocationMode, 0)
                 );
             }
             else
@@ -1437,11 +1439,25 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
     LPWSTR message = NULL;
     if (SUCCEEDED(args->lpVtbl->TryGetWebMessageAsString(args, &message)) && message)
     {
-        static const WCHAR autoLocationPrefix[] = L"ep_weather_auto_location|";
-        size_t autoLocationPrefixLength = ARRAYSIZE(autoLocationPrefix) - 1;
-        if (!_wcsnicmp(message, autoLocationPrefix, autoLocationPrefixLength))
+        static const WCHAR windowsLocationPrefix[] = L"ep_weather_windows_location|";
+        static const WCHAR directIpLocationPrefix[] = L"ep_weather_auto_location|";
+        LPCWSTR locationPrefix = NULL;
+        BOOL directIp = FALSE;
+        size_t locationPrefixLength = 0;
+        if (!_wcsnicmp(message, windowsLocationPrefix, ARRAYSIZE(windowsLocationPrefix) - 1))
         {
-            LPCWSTR requestId = message + autoLocationPrefixLength;
+            locationPrefix = windowsLocationPrefix;
+            locationPrefixLength = ARRAYSIZE(windowsLocationPrefix) - 1;
+        }
+        else if (!_wcsnicmp(message, directIpLocationPrefix, ARRAYSIZE(directIpLocationPrefix) - 1))
+        {
+            locationPrefix = directIpLocationPrefix;
+            locationPrefixLength = ARRAYSIZE(directIpLocationPrefix) - 1;
+            directIp = TRUE;
+        }
+        if (locationPrefix)
+        {
+            LPCWSTR requestId = message + locationPrefixLength;
             size_t requestIdLength = wcsnlen_s(
                 requestId,
                 EP_WEATHER_AUTO_LOCATION_REQUEST_ID_MAX
@@ -1456,15 +1472,22 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
                 );
                 _this->dwAutoLocationBrowserGeneration =
                     InterlockedAdd64(&_this->dwBrowserGeneration, 0);
-                HRESULT locationHr = EPWeather_BeginDirectIpLocation(
-                    _this->hWnd,
-                    _this->dwAutoLocationBrowserGeneration,
-                    requestId
-                );
+                HRESULT locationHr = directIp
+                    ? EPWeather_BeginDirectIpLocation(
+                        _this->hWnd,
+                        _this->dwAutoLocationBrowserGeneration,
+                        requestId
+                    )
+                    : EPWeather_BeginWindowsLocation(
+                        _this->hWnd,
+                        _this->dwAutoLocationBrowserGeneration,
+                        requestId
+                    );
                 if (FAILED(locationHr))
                 {
                     printf(
-                        "[AutoLocation] Failed to start direct IP lookup: 0x%08x.\n",
+                        "[AutoLocation] Failed to start %s lookup: 0x%08x.\n",
+                        directIp ? "direct IP" : "Windows location",
                         (unsigned int)locationHr
                     );
                     epw_Weather_PostAutoLocationError(_this, requestId);
@@ -1472,7 +1495,7 @@ HRESULT STDMETHODCALLTYPE ICoreWebView2_WebMessageReceived(
                 }
                 else
                 {
-                    printf("[AutoLocation] Direct IP lookup started.\n");
+                    printf("[AutoLocation] %s lookup started.\n", directIp ? "Direct IP" : "Windows location");
                 }
             }
         }
@@ -1974,7 +1997,7 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
     }
     else if (uMsg == EP_WEATHER_WM_AUTO_LOCATION_RESULT)
     {
-        EPWeatherDirectLocationResult* result = (EPWeatherDirectLocationResult*)lParam;
+        EPWeatherLocationResult* result = (EPWeatherLocationResult*)lParam;
         BOOL requestMatches = result &&
             InterlockedAdd64(&_this->bAutoLocationInFlight, 0) &&
             !_wcsicmp(result->requestId, _this->wszAutoLocationRequestId) &&
@@ -1989,22 +2012,23 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
                 if (FAILED(postHr))
                 {
                     printf(
-                        "[AutoLocation] Failed to deliver direct IP result: 0x%08x.\n",
+                        "[AutoLocation] Failed to deliver location result: 0x%08x.\n",
                         (unsigned int)postHr
                     );
                 }
                 else if (result->success)
                 {
                     printf(
-                        "[AutoLocation] Direct IP location resolved: %.4f, %.4f.\n",
+                        "[AutoLocation] Location resolved: %.4f, %.4f (accuracy %.0f m).\n",
                         result->latitude,
-                        result->longitude
+                        result->longitude,
+                        result->accuracyMeters
                     );
                 }
             }
             else
             {
-                printf("[AutoLocation] Ignored a stale direct IP result.\n");
+                printf("[AutoLocation] Ignored a stale location result.\n");
             }
             epw_Weather_ResetAutoLocationRequest(_this);
         }

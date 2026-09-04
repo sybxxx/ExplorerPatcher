@@ -43,11 +43,17 @@ const mockBootstrap = String.raw`<script>
       if (type === 'message') nativeMessageListeners.push(listener);
     },
     postMessage: function(message) {
-      if (scenario !== 'auto' || !message.startsWith('ep_weather_auto_location|')) return;
-      const requestId = message.slice('ep_weather_auto_location|'.length);
+      const windowsLocationPrefix = 'ep_weather_windows_location|';
+      const directIpLocationPrefix = 'ep_weather_auto_location|';
+      const isWindowsLocation = message.startsWith(windowsLocationPrefix);
+      const isDirectIpLocation = message.startsWith(directIpLocationPrefix);
+      if ((scenario !== 'auto' && scenario !== 'windows-auto') ||
+          (!isWindowsLocation && !isDirectIpLocation)) return;
+      const prefix = isWindowsLocation ? windowsLocationPrefix : directIpLocationPrefix;
+      const requestId = message.slice(prefix.length);
       setTimeout(function() {
-        const payload = JSON.stringify({ ok: true, latitude: 26.89, longitude: 112.57, city: '\u8861\u9633\u5e02', region: '\u6e56\u5357\u7701', country: '\u4e2d\u56fd' });
-        for (const listener of nativeMessageListeners) listener({ data: 'ep_weather_auto_location_result|' + requestId + '|' + payload });
+        const payload = JSON.stringify({ ok: true, latitude: 26.89, longitude: 112.57, accuracyMeters: isWindowsLocation ? 35 : 0, city: '\u8861\u9633\u5e02', region: '\u6e56\u5357\u7701', country: '\u4e2d\u56fd' });
+        for (const listener of nativeMessageListeners) listener({ data: 'ep_weather_location_result|' + requestId + '|' + payload });
       }, 10);
     }
   } };
@@ -90,7 +96,9 @@ const mockBootstrap = String.raw`<script>
     return { ok: true, status: 200, headers: { get: function() { return null; } }, json: async function() { return body; } };
   };
   window.addEventListener('DOMContentLoaded', function() {
-    window.epWeatherGetData(scenario === 'auto' ? '' : '\u84b8\u6e58\u533a', 'zh-CN', 0, 40, 40, 'preview.qweatherapi.com');
+    const automatic = scenario === 'auto' || scenario === 'windows-auto';
+    const locationMode = scenario === 'auto' ? 2 : 0;
+    window.epWeatherGetData(automatic ? '' : '\u84b8\u6e58\u533a', 'zh-CN', 0, 40, 40, 'preview.qweatherapi.com', locationMode);
     if (scenario === 'stale') {
       setTimeout(function() {
         window.epWeatherGetData('\u5cb3\u9e93\u533a', 'zh-CN', 0, 40, 40, 'preview.qweatherapi.com');

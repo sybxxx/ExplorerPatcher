@@ -537,10 +537,11 @@
 ;x 0 %R:1528%
 ;x 1 %R:1529%
 "WeatherTemperatureUnit"=dword:00000000
-;;;c 2 Location accuracy
-;;;x 0 Generic (based on the IP address) (default)
-;;;x 1 Precise (geolocation)
-;;"WeatherLocationType"=dword:00000000
+;c 3 %R:1576%
+;x 0 %R:1577%
+;x 2 %R:1578%
+;x 3 %R:1579%
+"WeatherLocationType"=dword:00000000
 ;w %R:1533%
 ;%R:1534%
 ;%R:1535%

@@ -1,5 +1,9 @@
 #include "ep_weather_location.h"
 
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#include <LocationApi.h>
+#pragma warning(pop)
 #include <windows.data.json.h>
 #include <roapi.h>
 #include <strsafe.h>
@@ -13,6 +17,7 @@
 
 #pragma comment(lib, "runtimeobject.lib")
 #pragma comment(lib, "Wininet.lib")
+#pragma comment(lib, "locationapi.lib")
 
 using Microsoft::WRL::ComPtr;
 using Microsoft::WRL::Wrappers::HStringReference;
@@ -24,10 +29,11 @@ namespace
     constexpr DWORD kDirectLocationTimeout = 6000;
     constexpr size_t kResponseLimit = 32 * 1024;
 
-    struct DirectLocationRequest
+    struct LocationRequest
     {
         HWND notifyWindow;
         LONG64 browserGeneration;
+        BOOL directIp;
         WCHAR requestId[EP_WEATHER_AUTO_LOCATION_REQUEST_ID_MAX];
     };
 
@@ -156,7 +162,7 @@ namespace
 
     HRESULT ParseDirectLocationResponse(
         const std::string& response,
-        EPWeatherDirectLocationResult* result
+        EPWeatherLocationResult* result
     )
     {
         if (!result)
@@ -235,22 +241,111 @@ namespace
         result->status = S_OK;
         result->latitude = latitude;
         result->longitude = longitude;
+        result->accuracyMeters = 0;
         CopyJsonString(object.Get(), L"city", result->city, ARRAYSIZE(result->city));
         CopyJsonString(object.Get(), L"region", result->region, ARRAYSIZE(result->region));
         CopyJsonString(object.Get(), L"country", result->country, ARRAYSIZE(result->country));
         return S_OK;
     }
 
-    DWORD WINAPI DirectLocationWorker(void* parameter)
+    HRESULT ReadWindowsLocation(EPWeatherLocationResult* result)
     {
-        DirectLocationRequest* request = static_cast<DirectLocationRequest*>(parameter);
+        if (!result)
+        {
+            return E_INVALIDARG;
+        }
+
+        Microsoft::WRL::Wrappers::RoInitializeWrapper roInitialize(RO_INIT_MULTITHREADED);
+        if (FAILED(roInitialize))
+        {
+            return roInitialize;
+        }
+
+        ComPtr<ILocation> location;
+        HRESULT hr = CoCreateInstance(
+            CLSID_Location,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_PPV_ARGS(&location)
+        );
+        if (FAILED(hr) || !location)
+        {
+            return FAILED(hr) ? hr : E_FAIL;
+        }
+
+        hr = location->SetDesiredAccuracy(IID_ILatLongReport, LOCATION_DESIRED_ACCURACY_HIGH);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+        location->SetReportInterval(IID_ILatLongReport, 1000);
+
+        LOCATION_REPORT_STATUS status = REPORT_NOT_SUPPORTED;
+        const DWORD start = GetTickCount();
+        while (GetTickCount() - start < 10000)
+        {
+            hr = location->GetReportStatus(IID_ILatLongReport, &status);
+            if (FAILED(hr))
+            {
+                return hr;
+            }
+            if (status == REPORT_ACCESS_DENIED)
+            {
+                return E_ACCESSDENIED;
+            }
+            if (status == REPORT_NOT_SUPPORTED)
+            {
+                return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+            }
+            if (status == REPORT_ERROR)
+            {
+                return E_FAIL;
+            }
+            if (status == REPORT_RUNNING)
+            {
+                ComPtr<ILocationReport> baseReport;
+                if (SUCCEEDED(location->GetReport(IID_ILatLongReport, &baseReport)) && baseReport)
+                {
+                    ComPtr<ILatLongReport> report;
+                    if (SUCCEEDED(baseReport.As(&report)) && report)
+                    {
+                        double latitude = 0;
+                        double longitude = 0;
+                        double accuracy = 0;
+                        if (SUCCEEDED(report->GetLatitude(&latitude)) &&
+                            SUCCEEDED(report->GetLongitude(&longitude)) &&
+                            SUCCEEDED(report->GetErrorRadius(&accuracy)) &&
+                            std::isfinite(latitude) && std::isfinite(longitude) &&
+                            std::isfinite(accuracy) && accuracy > 0 &&
+                            accuracy <= EP_WEATHER_LOCATION_MAX_ACCURACY_METERS &&
+                            latitude >= -90.0 && latitude <= 90.0 &&
+                            longitude >= -180.0 && longitude <= 180.0)
+                        {
+                            result->success = TRUE;
+                            result->status = S_OK;
+                            result->latitude = latitude;
+                            result->longitude = longitude;
+                            result->accuracyMeters = accuracy;
+                            return S_OK;
+                        }
+                    }
+                }
+            }
+            Sleep(250);
+        }
+        return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+    }
+
+    DWORD WINAPI LocationWorker(void* parameter)
+    {
+        LocationRequest* request = static_cast<LocationRequest*>(parameter);
         if (!request)
         {
             return 0;
         }
 
-        EPWeatherDirectLocationResult* result = static_cast<EPWeatherDirectLocationResult*>(
-            CoTaskMemAlloc(sizeof(EPWeatherDirectLocationResult))
+        EPWeatherLocationResult* result = static_cast<EPWeatherLocationResult*>(
+            CoTaskMemAlloc(sizeof(EPWeatherLocationResult))
         );
         if (result)
         {
@@ -258,11 +353,19 @@ namespace
             result->browserGeneration = request->browserGeneration;
             StringCchCopyW(result->requestId, ARRAYSIZE(result->requestId), request->requestId);
 
-            std::string response;
-            HRESULT hr = ReadDirectLocationResponse(&response);
-            if (SUCCEEDED(hr))
+            HRESULT hr = E_FAIL;
+            if (request->directIp)
             {
-                hr = ParseDirectLocationResponse(response, result);
+                std::string response;
+                hr = ReadDirectLocationResponse(&response);
+                if (SUCCEEDED(hr))
+                {
+                    hr = ParseDirectLocationResponse(response, result);
+                }
+            }
+            else
+            {
+                hr = ReadWindowsLocation(result);
             }
             result->status = hr;
             if (FAILED(hr))
@@ -290,10 +393,11 @@ namespace
     }
 }
 
-extern "C" HRESULT EPWeather_BeginDirectIpLocation(
+static HRESULT EPWeather_BeginLocation(
     HWND notifyWindow,
     LONG64 browserGeneration,
-    LPCWSTR requestId
+    LPCWSTR requestId,
+    BOOL directIp
 )
 {
     if (!notifyWindow || !IsWindow(notifyWindow) || !requestId || !requestId[0] ||
@@ -302,8 +406,8 @@ extern "C" HRESULT EPWeather_BeginDirectIpLocation(
         return E_INVALIDARG;
     }
 
-    DirectLocationRequest* request = static_cast<DirectLocationRequest*>(
-        CoTaskMemAlloc(sizeof(DirectLocationRequest))
+    LocationRequest* request = static_cast<LocationRequest*>(
+        CoTaskMemAlloc(sizeof(LocationRequest))
     );
     if (!request)
     {
@@ -313,6 +417,7 @@ extern "C" HRESULT EPWeather_BeginDirectIpLocation(
     ZeroMemory(request, sizeof(*request));
     request->notifyWindow = notifyWindow;
     request->browserGeneration = browserGeneration;
+    request->directIp = directIp;
     HRESULT hr = StringCchCopyW(request->requestId, ARRAYSIZE(request->requestId), requestId);
     if (FAILED(hr))
     {
@@ -320,7 +425,7 @@ extern "C" HRESULT EPWeather_BeginDirectIpLocation(
         return hr;
     }
 
-    HANDLE worker = CreateThread(nullptr, 0, DirectLocationWorker, request, 0, nullptr);
+    HANDLE worker = CreateThread(nullptr, 0, LocationWorker, request, 0, nullptr);
     if (!worker)
     {
         hr = HRESULT_FROM_WIN32(GetLastError());
@@ -329,4 +434,22 @@ extern "C" HRESULT EPWeather_BeginDirectIpLocation(
     }
     CloseHandle(worker);
     return S_OK;
+}
+
+extern "C" HRESULT EPWeather_BeginWindowsLocation(
+    HWND notifyWindow,
+    LONG64 browserGeneration,
+    LPCWSTR requestId
+)
+{
+    return EPWeather_BeginLocation(notifyWindow, browserGeneration, requestId, FALSE);
+}
+
+extern "C" HRESULT EPWeather_BeginDirectIpLocation(
+    HWND notifyWindow,
+    LONG64 browserGeneration,
+    LPCWSTR requestId
+)
+{
+    return EPWeather_BeginLocation(notifyWindow, browserGeneration, requestId, TRUE);
 }

@@ -72,9 +72,13 @@ function labels() {
   return isChinese() ? {
     loading: '\u52a0\u8f7d\u4e2d...',
     error: '\u65e0\u6cd5\u83b7\u53d6\u5929\u6c14',
-    autoLocation: '\u6b63\u5728\u901a\u8fc7\u76f4\u8fde IP \u5b9a\u4f4d...',
-    autoLocationError: '\u76f4\u8fde IP \u5b9a\u4f4d\u5931\u8d25\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
-    directIp: '\u76f4\u8fde IP',
+    windowsLocation: '\u6b63\u5728\u4f7f\u7528 Windows \u5b9a\u4f4d...',
+    windowsLocationError: 'Windows \u65e0\u6cd5\u63d0\u4f9b\u53ef\u9760\u4f4d\u7f6e\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
+    directIpLocation: '\u6b63\u5728\u4f7f\u7528\u76f4\u8fde IP \u8fd1\u4f3c\u5b9a\u4f4d...',
+    directIpError: '\u76f4\u8fde IP \u8fd1\u4f3c\u5b9a\u4f4d\u5931\u8d25\uff0c\u8bf7\u8f93\u5165\u5730\u70b9',
+    manualLocationError: '\u8bf7\u8f93\u5165\u5730\u70b9',
+    windowsLocationSource: 'Windows \u5b9a\u4f4d',
+    directIpSource: '\u76f4\u8fde IP \u8fd1\u4f3c',
     feels: '\u4f53\u611f\u6e29\u5ea6',
     humidity: '\u76f8\u5bf9\u6e7f\u5ea6',
     wind: '\u98ce\u5411\u98ce\u901f',
@@ -134,9 +138,13 @@ function labels() {
   } : {
     loading: 'Loading...',
     error: 'Unable to load weather',
-    autoLocation: 'Locating through a direct IP connection...',
-    autoLocationError: 'Direct IP location failed; enter a location manually',
-    directIp: 'Direct IP',
+    windowsLocation: 'Locating with Windows location services...',
+    windowsLocationError: 'Windows could not provide a reliable location; enter one manually',
+    directIpLocation: 'Locating through a direct IP connection...',
+    directIpError: 'Direct IP location failed; enter a location manually',
+    manualLocationError: 'Enter a location',
+    windowsLocationSource: 'Windows location',
+    directIpSource: 'Direct IP approximate',
     feels: 'Feels like',
     humidity: 'Humidity',
     wind: 'Wind',
@@ -329,11 +337,25 @@ function hasCurrentData() {
   return currentSource() !== null;
 }
 
+function automaticLocationLabel() {
+  const value = labels();
+  if (state.locationMode === LOCATION_MODE_DIRECT_IP) return value.directIpLocation;
+  if (state.locationMode === LOCATION_MODE_MANUAL) return value.manualLocationError;
+  return value.windowsLocation;
+}
+
+function automaticLocationErrorLabel() {
+  const value = labels();
+  if (state.locationMode === LOCATION_MODE_DIRECT_IP) return value.directIpError;
+  if (state.locationMode === LOCATION_MODE_MANUAL) return value.manualLocationError;
+  return value.windowsLocationError;
+}
+
 function setLoading() {
   const value = labels();
   setStaticLabels();
   document.documentElement.lang = state.language || 'en';
-  elements.location.textContent = state.location || value.autoLocation;
+  elements.location.textContent = state.location || automaticLocationLabel();
   elements.resolved.textContent = '';
   elements.providerState.textContent = '';
   elements.providerState.classList.remove('warning');
@@ -383,7 +405,7 @@ function setLoading() {
 function setError() {
   setLoading();
   const value = labels();
-  elements.condition.textContent = state.location ? value.error : value.autoLocationError;
+  elements.condition.textContent = state.location ? value.error : automaticLocationErrorLabel();
   elements.providerState.textContent = state.apiHost ? labels().fallback : 'Open-Meteo';
   elements.providerState.classList.add('warning');
 }
@@ -1055,8 +1077,11 @@ function renderWeather() {
   const resolvedParts = [state.place && state.place.city, state.place && (state.place.province || state.place.country)]
     .map((part) => textValue(part))
     .filter((part, index, array) => part && array.indexOf(part) === index && part !== elements.location.textContent);
-  if (state.place && /^Direct IP/i.test(textValue(state.place.source))) {
-    resolvedParts.push(value.directIp);
+  const locationSource = textValue(state.place && state.place.source);
+  if (/^Windows Location/i.test(locationSource)) {
+    resolvedParts.push(value.windowsLocationSource);
+  } else if (/^Direct IP/i.test(locationSource)) {
+    resolvedParts.push(value.directIpSource);
   }
   elements.resolved.textContent = resolvedParts.join(' \u00b7 ');
   renderProviderState();
@@ -1154,12 +1179,16 @@ function safeField(value) {
   return textValue(value).replace(/[#"]/g, ' ');
 }
 
-window.epWeatherGetData = function(location, language, unit, width, height, apiHost) {
+window.epWeatherGetData = function(location, language, unit, width, height, apiHost, locationMode) {
   const cleanLocation = textValue(location);
   const cleanLanguage = textValue(language, 'en-US') || 'en-US';
   const selectedUnit = Number(unit) ? 1 : 0;
   const cleanHost = validQWeatherHost(apiHost) ? textValue(apiHost).toLowerCase() : '';
-  const key = `${cleanLocation}\n${cleanLanguage}\n${selectedUnit}\n${cleanHost}`;
+  const numericLocationMode = Number(locationMode);
+  const selectedLocationMode = [LOCATION_MODE_WINDOWS, LOCATION_MODE_LEGACY_PRECISE,
+    LOCATION_MODE_DIRECT_IP, LOCATION_MODE_MANUAL].includes(numericLocationMode)
+    ? numericLocationMode : LOCATION_MODE_WINDOWS;
+  const key = `${cleanLocation}\n${cleanLanguage}\n${selectedUnit}\n${cleanHost}\n${selectedLocationMode}`;
   state.iconWidth = width;
   state.iconHeight = height;
   if (state.key !== key) {
@@ -1168,6 +1197,7 @@ window.epWeatherGetData = function(location, language, unit, width, height, apiH
     state.language = cleanLanguage;
     state.unit = selectedUnit;
     state.apiHost = cleanHost;
+    state.locationMode = selectedLocationMode;
     resetState();
     initializeWeather(state.generation);
     return 'ep_pending';
@@ -1199,6 +1229,8 @@ if (window.__epWeatherTestMode) {
     normalizeQAlerts,
     normalizeQAir,
     normalizeOpenMeteo,
+    normalizeDirectIpLocation,
+    normalizeWindowsLocation,
     validQWeatherHost,
     refreshDue,
     DATASET_TTL,

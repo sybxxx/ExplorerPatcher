@@ -46,6 +46,8 @@ for (const text of [
   '/airquality/v1/current/',
   '/geo/v2/city/lookup',
   'ep_weather_auto_location|',
+  'ep_weather_windows_location|',
+  'normalizeWindowsLocation',
   'requestDirectIpLocation',
   'normalizeDirectIpLocation',
   'resolveAutomaticLocation',
@@ -96,6 +98,8 @@ for (const text of [
   'ep_weather_theme_light',
   'ep_weather_auto_location_result|',
   'ep_weather_auto_location_error|',
+  'ep_weather_location_result|',
+  'ep_weather_location_error|',
   'MANUAL_REFRESH_COOLDOWN',
   'refreshWeatherNow',
   'hero-range',
@@ -169,7 +173,7 @@ vm.createContext(sandbox);
 vm.runInContext(`${dataSource}\n;globalThis.weatherTests = {
   normalizeQCurrent, normalizeQHourly, normalizeQDaily, normalizeQMinutely,
   normalizeQAlerts, normalizeQAir, normalizeOpenMeteo, validQWeatherHost,
-  normalizeDirectIpLocation
+  normalizeDirectIpLocation, normalizeWindowsLocation
 };`, sandbox);
 const normalizers = sandbox.weatherTests;
 
@@ -255,9 +259,28 @@ assert.strictEqual(directLocation.city, '\u8861\u9633\u5e02');
 assert.strictEqual(directLocation.province, '\u6e56\u5357\u7701');
 assert.strictEqual(directLocation.country, '\u4e2d\u56fd');
 assert.strictEqual(directLocation.source, 'Direct IP');
+assert.strictEqual(directLocation.accuracyMeters, 0);
 assert.throws(
   () => normalizers.normalizeDirectIpLocation({ latitude: 91, longitude: 112 }),
   /Invalid direct IP location/
+);
+
+const windowsLocation = normalizers.normalizeWindowsLocation({
+  latitude: 26.89,
+  longitude: 112.57,
+  accuracyMeters: 35
+});
+assert.strictEqual(windowsLocation.lat, 26.89);
+assert.strictEqual(windowsLocation.lon, 112.57);
+assert.strictEqual(windowsLocation.accuracyMeters, 35);
+assert.strictEqual(windowsLocation.source, 'Windows Location');
+assert.throws(
+  () => normalizers.normalizeWindowsLocation({ latitude: 26.89, longitude: 112.57, accuracyMeters: 50001 }),
+  /Windows location is not accurate enough/
+);
+assert.throws(
+  () => normalizers.normalizeWindowsLocation({ latitude: 26.89, longitude: 112.57 }),
+  /Windows location is not accurate enough/
 );
 
 assert.strictEqual(normalizers.validQWeatherHost('abc123.qweatherapi.com'), true);
@@ -318,7 +341,79 @@ for (const text of [
     throw new Error(`Missing direct IP location protection: ${text}`);
   }
 }
+for (const text of [
+  'CLSID_Location',
+  'SetDesiredAccuracy',
+  'REPORT_NOT_SUPPORTED',
+  'EPWeather_BeginWindowsLocation',
+  'accuracyMeters'
+]) {
+  if (!locationSource.includes(text) && !hostSource.includes(text)) {
+    throw new Error(`Missing Windows native location protection: ${text}`);
+  }
+}
+assert.ok(!locationSource.includes('DirectLocationRequest'), 'The location worker should be shared by both native modes');
 assert.ok(!locationSource.includes('INTERNET_OPEN_TYPE_PRECONFIG'), 'Direct IP lookup must not use the system proxy');
+
+async function verifyNativeLocationModes(source) {
+  const nativeMessageListeners = [];
+  const postedMessages = [];
+  let nextWindowsAccuracy = 120;
+  const sandbox = {
+    AbortController,
+    URL,
+    clearInterval,
+    clearTimeout,
+    console,
+    setInterval: () => 1,
+    setTimeout,
+    window: {
+      fetch: async () => { throw new Error('Unexpected network call'); }
+    }
+  };
+  sandbox.window.chrome = { webview: {
+    addEventListener: (type, listener) => {
+      if (type === 'message') nativeMessageListeners.push(listener);
+    },
+    postMessage: (message) => {
+      postedMessages.push(message);
+      const windowsPrefix = 'ep_weather_windows_location|';
+      const directPrefix = 'ep_weather_auto_location|';
+      const isWindows = message.startsWith(windowsPrefix);
+      const prefix = isWindows ? windowsPrefix : directPrefix;
+      if (!isWindows && !message.startsWith(directPrefix)) throw new Error(`Unexpected native message: ${message}`);
+      const requestId = message.slice(prefix.length);
+      const payload = JSON.stringify({
+        ok: true,
+        latitude: 26.89,
+        longitude: 112.57,
+        accuracyMeters: isWindows ? nextWindowsAccuracy : 0
+      });
+      for (const listener of nativeMessageListeners) {
+        listener({ data: `ep_weather_location_result|${requestId}|${payload}` });
+      }
+    }
+  } };
+  vm.createContext(sandbox);
+  vm.runInContext(`${source}\n;globalThis.locationTests = { state, resolveAutomaticLocation };`, sandbox);
+
+  const windowsLocation = await sandbox.locationTests.resolveAutomaticLocation(0);
+  assert.ok(postedMessages[0].startsWith('ep_weather_windows_location|'), 'Default automatic mode must use Windows location');
+  assert.strictEqual(windowsLocation.source, 'Windows Location');
+  assert.strictEqual(windowsLocation.accuracyMeters, 120);
+
+  sandbox.locationTests.state.locationMode = 2;
+  const directLocation = await sandbox.locationTests.resolveAutomaticLocation(0);
+  assert.ok(postedMessages[1].startsWith('ep_weather_auto_location|'), 'Direct IP must remain an explicit mode');
+  assert.strictEqual(directLocation.source, 'Direct IP');
+
+  sandbox.locationTests.state.locationMode = 0;
+  nextWindowsAccuracy = 50001;
+  await assert.rejects(
+    sandbox.locationTests.resolveAutomaticLocation(0),
+    /Windows location is not accurate enough/
+  );
+}
 
 const configSource = fs.readFileSync(configPath, 'utf8');
 for (const text of ['CryptProtectData', 'CryptUnprotectData', 'REG_BINARY', '.qweatherapi.com']) {
@@ -331,11 +426,16 @@ for (const settingsPath of settingsPaths) {
   }
 }
 
-console.log(JSON.stringify({
-  htmlLength: html.length,
-  scriptLength: scriptEnd - scriptStart,
-  stringLiteralCount: bodies.length,
-  iconGlyphs: Object.keys(embeddedIconMap).length,
-  hourlyPoints: hourly.length,
-  status: 'ok'
-}));
+verifyNativeLocationModes(dataSource).then(() => {
+  console.log(JSON.stringify({
+    htmlLength: html.length,
+    scriptLength: scriptEnd - scriptStart,
+    stringLiteralCount: bodies.length,
+    iconGlyphs: Object.keys(embeddedIconMap).length,
+    hourlyPoints: hourly.length,
+    status: 'ok'
+  }));
+}).catch((error) => {
+  console.error(error && error.stack || error);
+  process.exitCode = 1;
+});

@@ -12,6 +12,11 @@ const FALLBACK_TTL = 10 * 60 * 1000;
 const FAILURE_RETRY_DELAY = 2 * 60 * 1000;
 const RATE_LIMIT_BACKOFF = 15 * 60 * 1000;
 const AUTO_LOCATION_REQUEST_TIMEOUT = 12 * 1000;
+const LOCATION_MODE_WINDOWS = 0;
+const LOCATION_MODE_LEGACY_PRECISE = 1;
+const LOCATION_MODE_DIRECT_IP = 2;
+const LOCATION_MODE_MANUAL = 3;
+const LOCATION_MAX_ACCURACY_METERS = 50000;
 
 const state = {
   key: '',
@@ -21,6 +26,7 @@ const state = {
   language: 'en-US',
   unit: 0,
   apiHost: '',
+  locationMode: LOCATION_MODE_WINDOWS,
   generation: 0,
   coords: null,
   place: null,
@@ -176,10 +182,17 @@ function clearAutoLocationWaiters() {
 
 function handleNativeWeatherMessage(event) {
   const message = textValue(event && event.data);
-  const resultPrefix = 'ep_weather_auto_location_result|';
-  const errorPrefix = 'ep_weather_auto_location_error|';
-  const prefix = message.startsWith(resultPrefix) ? resultPrefix
-    : message.startsWith(errorPrefix) ? errorPrefix : '';
+  const resultPrefix = message.startsWith('ep_weather_location_result|')
+    ? 'ep_weather_location_result|'
+    : message.startsWith('ep_weather_auto_location_result|')
+      ? 'ep_weather_auto_location_result|'
+      : '';
+  const errorPrefix = message.startsWith('ep_weather_location_error|')
+    ? 'ep_weather_location_error|'
+    : message.startsWith('ep_weather_auto_location_error|')
+      ? 'ep_weather_auto_location_error|'
+      : '';
+  const prefix = resultPrefix || errorPrefix;
   if (!prefix) return false;
   const separator = message.indexOf('|', prefix.length);
   if (separator < 0) return false;
@@ -193,42 +206,53 @@ function handleNativeWeatherMessage(event) {
     return true;
   }
   if (prefix === errorPrefix) {
-    waiter.reject(new Error('Direct IP location unavailable'));
+    waiter.reject(new Error('Native location unavailable'));
     return true;
   }
   try {
     const payload = JSON.parse(message.slice(separator + 1));
-    if (!payload || payload.ok !== true) throw new Error('Direct IP location unavailable');
+    if (!payload || payload.ok !== true) throw new Error('Native location unavailable');
     waiter.resolve(payload);
   } catch (error) {
-    waiter.reject(new Error('Invalid direct IP location response'));
+    waiter.reject(new Error('Invalid native location response'));
   }
   return true;
 }
 
-function requestDirectIpLocation(generation) {
+function requestNativeLocation(mode, generation) {
   if (generation !== state.generation) {
     return Promise.reject(new Error('Superseded location request'));
   }
   const webview = window.chrome && window.chrome.webview;
   if (!webview || typeof webview.postMessage !== 'function') {
-    return Promise.reject(new Error('Direct IP location requires the native weather host'));
+    return Promise.reject(new Error('Native location requires the native weather host'));
   }
   const requestId = `${Date.now().toString(36)}-${(++autoLocationSequence).toString(36)}`;
+  const messagePrefix = mode === LOCATION_MODE_DIRECT_IP
+    ? 'ep_weather_auto_location|'
+    : 'ep_weather_windows_location|';
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       autoLocationWaiters.delete(requestId);
-      reject(new Error('Direct IP location timed out'));
+      reject(new Error('Native location timed out'));
     }, AUTO_LOCATION_REQUEST_TIMEOUT);
     autoLocationWaiters.set(requestId, { generation, resolve, reject, timer });
     try {
-      webview.postMessage(`ep_weather_auto_location|${requestId}`);
+      webview.postMessage(`${messagePrefix}${requestId}`);
     } catch (error) {
       clearTimeout(timer);
       autoLocationWaiters.delete(requestId);
-      reject(new Error('Direct IP location unavailable'));
+      reject(new Error('Native location unavailable'));
     }
   });
+}
+
+function requestDirectIpLocation(generation) {
+  return requestNativeLocation(LOCATION_MODE_DIRECT_IP, generation);
+}
+
+function requestWindowsLocation(generation) {
+  return requestNativeLocation(LOCATION_MODE_WINDOWS, generation);
 }
 
 function normalizeDirectIpLocation(raw) {
@@ -248,22 +272,63 @@ function normalizeDirectIpLocation(raw) {
     city,
     province: region,
     country,
+    accuracyMeters: 0,
     source: 'Direct IP'
   };
 }
 
-async function resolveAutomaticLocation(generation) {
-  const direct = normalizeDirectIpLocation(await requestDirectIpLocation(generation));
+function normalizeWindowsLocation(raw) {
+  const latitude = finiteNumber(raw && raw.latitude);
+  const longitude = finiteNumber(raw && raw.longitude);
+  const accuracy = finiteNumber(raw && raw.accuracyMeters);
+  if (latitude === null || longitude === null || latitude < -90 || latitude > 90 ||
+      longitude < -180 || longitude > 180 || accuracy === null || accuracy <= 0 ||
+      accuracy > LOCATION_MAX_ACCURACY_METERS) {
+    throw new Error('Windows location is not accurate enough');
+  }
+  return {
+    lat: latitude,
+    lon: longitude,
+    name: 'Current location',
+    city: '',
+    province: '',
+    country: '',
+    accuracyMeters: accuracy,
+    source: 'Windows Location'
+  };
+}
+
+async function refineLocationWithQWeather(place, generation) {
   if (state.apiHost && !state.qAuthFailed) {
     try {
-      const resolved = await resolveQWeatherLocation(`${direct.lon},${direct.lat}`, generation);
-      return { ...resolved, source: 'Direct IP + QWeather' };
+      const resolved = await resolveQWeatherLocation(`${place.lon},${place.lat}`, generation);
+      return {
+        ...resolved,
+        accuracyMeters: place.accuracyMeters,
+        source: `${place.source} + QWeather`
+      };
     } catch (error) {
       const status = Number(error && error.status) || 0;
       if (status === 401 || status === 403) state.qAuthFailed = true;
     }
   }
-  return direct;
+  return place;
+}
+
+async function resolveAutomaticLocation(generation) {
+  if (state.locationMode === LOCATION_MODE_MANUAL) {
+    throw new Error('Manual location required');
+  }
+  if (state.locationMode === LOCATION_MODE_DIRECT_IP) {
+    return refineLocationWithQWeather(
+      normalizeDirectIpLocation(await requestDirectIpLocation(generation)),
+      generation
+    );
+  }
+  return refineLocationWithQWeather(
+    normalizeWindowsLocation(await requestWindowsLocation(generation)),
+    generation
+  );
 }
 
 function qweatherResponse(data) {

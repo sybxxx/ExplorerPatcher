@@ -16,21 +16,30 @@ The API Key is protected with Windows DPAPI for the current user and stored as `
 
 ## Location selection and proxy safety
 
-The **Location** field has two modes:
+The **Location** field remains the most stable override. A non-empty value is
+treated as an explicit city, district, or postal-code query and is never
+replaced by automatic detection.
 
-- A non-empty value is treated as an explicit city, district, or postal-code
-  query and remains the manual override.
-- An empty value enables automatic location. The native weather host makes one
-  bounded request to `https://ipwho.is/` with WinInet's `INTERNET_OPEN_TYPE_DIRECT`
-  mode, which bypasses the configured system proxy. The widget therefore does
-  not use the `127.0.0.1:10808` proxy exit address as the weather location.
+When the field is empty, the default **Windows precise location** mode asks the
+Windows Location service for a coordinate through the native Location API. It
+requests high accuracy and accepts a report only when Windows supplies a
+positive error radius no larger than 50 km. The coordinate is then passed to
+QWeather's city lookup to obtain the displayed city or district. This request
+does not use the WebView2 page, Google, or the `127.0.0.1:10808` proxy.
 
-The direct lookup returns an approximate public-IP location, not GPS precision.
-When QWeather is configured, the resulting coordinates are passed through
-QWeather's city lookup to obtain the displayed place name. If the direct lookup
-cannot complete, the widget does not silently fall back to the proxy-based IP;
-enter a manual location instead. A VPN or transparent/TUN network that changes
-the direct route cannot be distinguished from the real network by this check.
+If Windows has no usable Wi-Fi, GPS, cellular, or other location report, the
+widget stops with a clear request for a manual location. It does not silently
+fall back to an IP-derived city, so a wired-only computer will not suddenly
+inherit a wrong city from the proxy or a coarse network database. A Windows
+location report is still subject to the accuracy reported by the operating
+system; it is not a guarantee of street-level accuracy.
+
+The optional **Direct IP approximate location** mode makes one bounded request
+to `https://ipwho.is/` with WinInet's `INTERNET_OPEN_TYPE_DIRECT` mode. It is
+explicitly opt-in, bypasses the configured system proxy, and labels the result
+as approximate. A VPN or transparent/TUN network that changes the direct route
+cannot be distinguished from the real network by this check. **Manual location
+only** disables both automatic sources.
 
 ## Data and refresh policy
 
@@ -38,7 +47,7 @@ The provider uses these endpoints:
 
 | Dataset | Endpoint | Refresh interval |
 | --- | --- | ---: |
-| Location | Direct IP lookup, then `/geo/v2/city/lookup` when configured | Once per page lifecycle |
+| Location | Windows Location service, then `/geo/v2/city/lookup` when configured | Once per page lifecycle |
 | Current conditions | `/weather/v1/current/{lat}/{lon}` | 10 minutes |
 | 24 hourly forecasts | `/weather/v1/hourly/{lat}/{lon}` | 60 minutes |
 | 5 daily forecasts | `/weather/v1/daily/{lat}/{lon}` | 3 hours |
@@ -64,7 +73,7 @@ host reapplies these colors when Windows broadcasts a color-scheme change.
 
 ## Fallback and attribution
 
-Without valid QWeather credentials, or when the first QWeather current-conditions request cannot complete, the widget keeps its lightweight Open-Meteo fallback. Esri and Photon remain manual-query fallback geocoders. Automatic location never falls back to a proxy-observed IP address. The popup labels fallback mode instead of presenting Open-Meteo data as QWeather data.
+Without valid QWeather credentials, or when the first QWeather current-conditions request cannot complete, the widget keeps its lightweight Open-Meteo fallback. Esri and Photon remain manual-query fallback geocoders. Windows location failure never falls back to an IP address; the user must enter a manual location or explicitly select the approximate IP mode. The popup labels fallback mode instead of presenting Open-Meteo data as QWeather data.
 
 QWeather mode displays the required QWeather attribution, uses the official `metadata.attributions` link when supplied, and preserves source names returned in each API response's `refer.sources` field. The local page creates source links without loading remote pages inside the weather WebView.
 
@@ -120,6 +129,6 @@ node ep_weather_host\verify_open_meteo_provider.js
 pwsh -File ep_weather_host\verify_qweather_config.ps1
 ```
 
-The generated `ep_weather_provider_open_meteo_html.h` remains the C build input for compatibility with the existing weather provider. The verifiers check source/header synchronization, bounded C string literals, embedded official icon assets, JavaScript syntax, required endpoints and lifecycle limits, current QWeather response normalization, native header injection, strict API Host matching, direct-IP location routing, vertical scrolling behavior, and DPAPI storage.
+The generated `ep_weather_provider_open_meteo_html.h` remains the C build input for compatibility with the existing weather provider. The verifiers check source/header synchronization, bounded C string literals, embedded official icon assets, JavaScript syntax, required endpoints and lifecycle limits, current QWeather response normalization, native header injection, strict API Host matching, Windows-native and explicit direct-IP location routing, reported location accuracy, vertical scrolling behavior, and DPAPI storage.
 
 Real API acceptance still requires an account-specific API Host and API Key. Never add either value to test fixtures, logs, screenshots, commits, or build packages.
