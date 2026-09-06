@@ -10367,14 +10367,46 @@ HMODULE PrepareAlternateTaskbarImplementation(symbols_addr* symbols_PTRS, const 
         return NULL; // Prevent IAT hooks from being carried out
     }
 
+    enum
+    {
+        EP_TASKBAR_ABI_LEGACY = 2,
+        EP_TASKBAR_ABI_INITIALIZED = 3,
+    };
+
     typedef DWORD (*GetVersion_t)();
     GetVersion_t GetVersion = (GetVersion_t)GetProcAddress(hMyTaskbar, "GetVersion");
     DWORD version = GetVersion ? GetVersion() : 0;
-    if (version != 2)
+    if (version != EP_TASKBAR_ABI_LEGACY && version != EP_TASKBAR_ABI_INITIALIZED)
     {
         wprintf(L"[TB] '%s' with version %d is not compatible\n", pszTaskbarDll, version);
         FreeLibrary(hMyTaskbar);
+        g_hMyTaskbar = NULL;
         return NULL;
+    }
+
+    if (version == EP_TASKBAR_ABI_INITIALIZED)
+    {
+        // ABI 3 moved taskbar setup behind an explicit initialization call.
+        // EP_TrayUI_CreateInstance() rejects calls made before this succeeds.
+        typedef HRESULT (*EP_Taskbar_Initialize_t)();
+        EP_Taskbar_Initialize_t EP_Taskbar_Initialize =
+            (EP_Taskbar_Initialize_t)GetProcAddress(hMyTaskbar, "EP_Taskbar_Initialize");
+        if (!EP_Taskbar_Initialize)
+        {
+            wprintf(L"[TB] '%s' does not export EP_Taskbar_Initialize\n", pszTaskbarDll);
+            FreeLibrary(hMyTaskbar);
+            g_hMyTaskbar = NULL;
+            return NULL;
+        }
+
+        HRESULT hr = EP_Taskbar_Initialize();
+        if (FAILED(hr))
+        {
+            wprintf(L"[TB] '%s' initialization failed with HRESULT 0x%08X\n", pszTaskbarDll, (unsigned int)hr);
+            FreeLibrary(hMyTaskbar);
+            g_hMyTaskbar = NULL;
+            return NULL;
+        }
     }
 
     if ((eptf & EPTF_Taskbar) != 0)
@@ -10398,6 +10430,7 @@ HMODULE PrepareAlternateTaskbarImplementation(symbols_addr* symbols_PTRS, const 
             {
                 printf("[TB] Failed to hook TrayUI_CreateInstance()\n");
                 FreeLibrary(hMyTaskbar);
+                g_hMyTaskbar = NULL;
                 return NULL;
             }
         }

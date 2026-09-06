@@ -99,8 +99,8 @@ jobs:
         with:
           repository: ExplorerPatcher/ep_taskbar_releases
           fileName: ep_taskbar.*.dll
-          # Keep this aligned with the GetVersion() ABI check in ExplorerPatcher/dllmain.c.
-          tag: v1.0.2.0
+          # Keep this aligned with the GetVersion()/EP_Taskbar_Initialize ABI handling in ExplorerPatcher/dllmain.c.
+          tag: v1.0.3.0
           out-file-path: build/Release
 
       # build/Release/ep_taskbar.*.amd64.dll -> build/Release/x64/ep_taskbar.*.dll
