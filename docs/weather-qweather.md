@@ -118,14 +118,17 @@ The page no longer reports its document height to resize the native window. The
 the normal vertical mouse wheel used to move through the popup.
 
 The production layout includes a compact hero summary, temperature range,
-humidity meter, a direct two-hour precipitation summary, hourly probability
-badges, primary-pollutant emphasis, live air-quality context, and a five-day
-temperature-range/probability list. The two-hour summary shows whether rain is
-expected, the forecast accumulated amount, and the expected rain period. It
-does not expose the individual five-minute bars in the main UI. The current
-weather card is different: its QWeather precipitation field is the accumulated
-amount for the current one-hour observation period. All values come from the
-normalized provider response; the V2 prototype's sample values are not used.
+humidity meter, a two-hour precipitation chart, hourly probability badges,
+primary-pollutant emphasis, live air-quality context, and a five-day
+temperature-range/probability list. The two-hour chart has one bar per
+five-minute forecast interval, plus the total amount and meaningful rain
+period. Values below `0.05 mm` in one five-minute interval remain visible as
+gray trace bars, but do not trigger the wording "rain" or define the meaningful
+rain period. They are still included in the displayed accumulated total. The
+current weather card is different: its QWeather precipitation field is the
+accumulated amount for the current one-hour observation period. All values come
+from the normalized provider response; the V2 prototype's sample values are
+not used.
 The wind metric allows the full direction and speed to wrap inside its metric
 card rather than hiding the tail behind an ellipsis.
 

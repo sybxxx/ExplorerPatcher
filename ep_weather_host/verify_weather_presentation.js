@@ -6,7 +6,7 @@ const sandbox = { window: {}, URL, console };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'ep_weather_provider_data.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(__dirname, 'ep_weather_provider_presentation.js'), 'utf8') +
-  '\nglobalThis.tests = {finiteNumber, normalizeQMinutely, normalizeQHourly, localizedQWeatherText, minuteForecastView, datasetFailureDetails, qDatasetUrl, state};', sandbox);
+  '\nglobalThis.tests = {finiteNumber, normalizeQMinutely, normalizeQHourly, localizedQWeatherText, minutePrecipitationClass, minuteForecastView, datasetFailureDetails, qDatasetUrl, state};', sandbox);
 const t = sandbox.tests;
 for (const value of [null, undefined, '', ' ']) assert.equal(t.finiteNumber(value), null);
 assert.equal(t.finiteNumber('0'), 0);
@@ -31,10 +31,24 @@ let view = t.minuteForecastView(minute, now);
 assert.equal(view.points.length, 2);
 assert.equal(view.points[0].precip, .08);
 assert.equal(view.total, .08);
+assert.equal(view.peak, .08);
 assert.equal(view.raining, true);
 assert.equal(view.rainStart, '2026-09-06T20:00:00+08:00');
 assert.equal(view.rainEnd, '2026-09-06T20:00:00+08:00');
 assert.equal(t.minuteForecastView(minute, now + 3 * 3600000).available, false);
+assert.equal(t.minutePrecipitationClass(0), 'none');
+assert.equal(t.minutePrecipitationClass(.03), 'trace');
+assert.equal(t.minutePrecipitationClass(.08), 'light');
+assert.equal(t.minutePrecipitationClass(.2), 'moderate');
+assert.equal(t.minutePrecipitationClass(.4), 'heavy');
+const trace = t.normalizeQMinutely({code:'200', minutely: [
+  {fxTime: '2026-09-06T20:00:00+08:00', precip:'0.03'},
+  {fxTime: '2026-09-06T20:05:00+08:00', precip:'0.02'}
+]});
+const traceView = t.minuteForecastView(trace, now);
+assert.equal(traceView.raining, false);
+assert.equal(traceView.trace, true);
+assert.equal(traceView.rainStart, '');
 assert.equal(t.normalizeQMinutely({code:'200'}).available, false);
 assert.equal(t.normalizeQMinutely({code:'204'}).available, false);
 assert.equal(t.normalizeQMinutely({minutely:[{fxTime:dry[0].time}]}).points[0].precip, null);

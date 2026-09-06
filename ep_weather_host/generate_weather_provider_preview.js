@@ -43,6 +43,10 @@ const mockBootstrap = String.raw`<script>
       row.precipitation = { amount: { value: 0, unit: 'mm' }, probability: 0, type: 'none' };
     });
   }
+  if (scenario === 'trace') {
+    payloads.minutely.summary = '\u672a\u6765\u4e24\u5c0f\u65f6\u4ec5\u6709\u5fae\u91cf\u964d\u6c34';
+    payloads.minutely.minutely.forEach((row, index) => { row.precip = index >= 4 && index <= 18 ? '0.03' : '0.00'; });
+  }
   if (scenario === 'english') {
     payloads.current.condition = { code: '100', text: 'Sunny' };
     payloads.hourly.hours.forEach((row) => { row.condition = { code: '100', text: 'Sunny' }; });

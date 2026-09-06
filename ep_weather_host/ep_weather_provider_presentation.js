@@ -26,17 +26,33 @@ function localizedQWeatherText(item, chinese) {
   return text;
 }
 
+const MINUTE_TRACE_THRESHOLD_MM = 0.05;
+
+function minutePrecipitationClass(value) {
+  if (!Number.isFinite(Number(value)) || Number(value) <= 0) return 'none';
+  if (Number(value) < MINUTE_TRACE_THRESHOLD_MM) return 'trace';
+  if (Number(value) < 0.15) return 'light';
+  if (Number(value) < 0.3) return 'moderate';
+  return 'heavy';
+}
+
 function minuteForecastView(minute, now = Date.now()) {
   const points = (minute && minute.available !== false && Array.isArray(minute.points) ? minute.points : [])
     .filter((point) => Number.isFinite(Date.parse(point.time)) && Date.parse(point.time) + 300000 > now)
     .slice(0, 24);
   const valid = points.filter((point) => point.precip !== null && Number.isFinite(point.precip) && point.precip >= 0);
   const wet = valid.filter((point) => point.precip > 0);
-  const firstWet = wet[0] || null;
-  const lastWet = wet[wet.length - 1] || null;
-  return { points, available: valid.length > 0, raining: wet.length > 0,
+  // Keep trace amounts visible in the chart, but do not call them rain.
+  const meaningful = valid.filter((point) => point.precip >= MINUTE_TRACE_THRESHOLD_MM);
+  const firstTrace = wet[0] || null;
+  const lastTrace = wet[wet.length - 1] || null;
+  const firstWet = meaningful[0] || null;
+  const lastWet = meaningful[meaningful.length - 1] || null;
+  return { points, available: valid.length > 0, raining: meaningful.length > 0, trace: wet.length > 0,
+    peak: Math.max(0, ...valid.map((point) => point.precip)), scale: Math.max(0.1, ...valid.map((point) => point.precip)),
     total: valid.reduce((sum, point) => sum + point.precip, 0),
-    rainStart: firstWet && firstWet.time || '', rainEnd: lastWet && lastWet.time || '' };
+    rainStart: firstWet && firstWet.time || '', rainEnd: lastWet && lastWet.time || '',
+    traceStart: firstTrace && firstTrace.time || '', traceEnd: lastTrace && lastTrace.time || '' };
 }
 
 function datasetFailureDetails(errors, chinese) {

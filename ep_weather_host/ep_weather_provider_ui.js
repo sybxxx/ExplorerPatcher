@@ -32,10 +32,15 @@ const elements = {
   minuteUpdated: document.getElementById('minute-updated'),
   minuteSummary: document.getElementById('minute-summary'),
   minuteDot: document.getElementById('minute-dot'),
+  minuteThresholdHeavy: document.getElementById('minute-threshold-heavy'),
+  minuteThresholdLight: document.getElementById('minute-threshold-light'),
+  minuteChart: document.getElementById('minute-chart'),
+  minuteAxis: document.getElementById('minute-axis'),
   minuteTotalLabel: document.getElementById('minute-total-label'),
   minuteTotal: document.getElementById('minute-total'),
   minutePeriodLabel: document.getElementById('minute-period-label'),
   minutePeriod: document.getElementById('minute-period'),
+  minuteLegend: document.getElementById('minute-legend'),
   minuteNote: document.getElementById('minute-note'),
   hourly: document.getElementById('hourly'),
   hourlyNote: document.getElementById('hourly-note'),
@@ -118,11 +123,14 @@ function labels() {
     noRain: '\u672a\u6765 2 \u5c0f\u65f6\u6682\u65e0\u660e\u663e\u964d\u6c34',
     minutePoints: '\u6bcf 5 \u5206\u949f\u66f4\u65b0',
     minuteHint: '\u672a\u6765 2 \u5c0f\u65f6\u6982\u89c8',
-    minuteRain: '\u672a\u6765 2 \u5c0f\u65f6\u9884\u8ba1\u6709\u96e8',
+    minuteRain: '\u672a\u6765 2 \u5c0f\u65f6\u9884\u8ba1\u6709\u660e\u663e\u964d\u96e8',
+    minuteTrace: '\u672a\u6765 2 \u5c0f\u65f6\u4ec5\u6709\u5fae\u91cf\u964d\u6c34',
     minuteDry: '\u672a\u6765 2 \u5c0f\u65f6\u6682\u65e0\u660e\u663e\u964d\u96e8',
-    minuteTotalLabel: '\u9884\u8ba1\u7d2f\u8ba1\u964d\u96e8',
-    minutePeriodLabel: '\u9884\u8ba1\u964d\u96e8\u65f6\u6bb5',
+    minuteTotalLabel: '\u9884\u8ba1\u7d2f\u8ba1\u964d\u6c34',
+    minutePeriodLabel: '\u9884\u8ba1\u964d\u6c34\u65f6\u6bb5',
     minuteNoPeriod: '\u6682\u65e0',
+    minuteTracePeriod: '\u4ec5\u5fae\u91cf',
+    minuteLegend: '\u7070\u8272=\u5fae\u91cf \u00b7 \u84dd\u8272=\u8f83\u5c0f/\u4e2d\u7b49 \u964d\u6c34 \u00b7 \u6a59\u8272=\u8f83\u5f3a',
     minuteSource: '\u548c\u98ce\u5929\u6c14 \u00b7 \u6bcf 5 \u5206\u949f\u66f4\u65b0',
     qweather: '\u548c\u98ce\u5929\u6c14',
     primary: '\u9996\u8981\u6c61\u67d3\u7269',
@@ -201,11 +209,14 @@ function labels() {
     noRain: 'No significant precipitation in the next 2 hours',
     minutePoints: 'Updates every 5 minutes',
     minuteHint: 'Two-hour overview',
-    minuteRain: 'Rain is expected in the next 2 hours',
+    minuteRain: 'Meaningful rain is expected in the next 2 hours',
+    minuteTrace: 'Only trace precipitation is expected in the next 2 hours',
     minuteDry: 'No significant rain is expected in the next 2 hours',
-    minuteTotalLabel: 'Forecast total',
-    minutePeriodLabel: 'Rain period',
+    minuteTotalLabel: 'Forecast precipitation',
+    minutePeriodLabel: 'Precipitation period',
     minuteNoPeriod: 'None',
+    minuteTracePeriod: 'Trace only',
+    minuteLegend: 'Gray = trace · Blue = light/moderate · Orange = heavier',
     minuteSource: 'QWeather - updates every 5 minutes',
     qweather: 'QWeather',
     primary: 'Primary',
@@ -249,6 +260,7 @@ function setStaticLabels() {
   document.getElementById('minute-title').textContent = value.next2h;
   elements.minuteTotalLabel.textContent = value.minuteTotalLabel;
   elements.minutePeriodLabel.textContent = value.minutePeriodLabel;
+  elements.minuteLegend.textContent = value.minuteLegend;
   document.getElementById('hourly-title').textContent = value.hourly24;
   document.getElementById('air-title').textContent = value.air;
   document.getElementById('daily-title').textContent = value.daily5;
@@ -434,8 +446,13 @@ function setLoading() {
   elements.alerts.replaceChildren();
   elements.minuteSection.hidden = true;
   elements.minuteDot.classList.remove('is-raining');
+  elements.minuteThresholdHeavy.textContent = '';
+  elements.minuteThresholdLight.textContent = '';
+  elements.minuteChart.replaceChildren();
+  elements.minuteAxis.replaceChildren();
   elements.minuteTotal.textContent = '--';
   elements.minutePeriod.textContent = '';
+  elements.minuteLegend.textContent = '';
   elements.minuteNote.textContent = '';
   elements.airSection.hidden = true;
   elements.airLead.textContent = '';
@@ -791,6 +808,17 @@ function renderAlerts() {
   }
 }
 
+function minuteIntensityLabel(kind) {
+  const names = isChinese()
+    ? { none: '\u65e0\u964d\u6c34', trace: '\u5fae\u91cf', light: '\u8f83\u5c0f', moderate: '\u4e2d\u7b49', heavy: '\u8f83\u5f3a' }
+    : { none: 'No precipitation', trace: 'Trace', light: 'Light', moderate: 'Moderate', heavy: 'Heavier' };
+  return names[kind] || names.none;
+}
+
+function minuteSummaryText(view, value) {
+  return view.raining ? value.minuteRain : view.trace ? value.minuteTrace : value.minuteDry;
+}
+
 function renderMinuteForecast() {
   const value = labels();
   const minute = state.mode === 'qweather' && state.datasets.minutely && state.datasets.minutely.data;
@@ -806,23 +834,67 @@ function renderMinuteForecast() {
     elements.minuteSummary.textContent = value.unavailable;
     elements.minuteSummary.classList.remove('is-raining');
     elements.minuteDot.classList.remove('is-raining');
+    elements.minuteThresholdHeavy.textContent = '';
+    elements.minuteThresholdLight.textContent = '';
+    elements.minuteChart.replaceChildren();
+    elements.minuteAxis.replaceChildren();
     elements.minuteTotal.textContent = '--';
     elements.minutePeriod.textContent = value.minuteNoPeriod;
+    elements.minuteLegend.textContent = '';
     elements.minuteNote.textContent = '';
     return;
   }
+
   elements.minuteUpdated.textContent = [value.minutePoints, formatTime(minute.updated)].filter(Boolean).join(' | ');
-  const raining = view.raining;
-  elements.minuteSummary.textContent = raining ? value.minuteRain : value.minuteDry;
-  elements.minuteSummary.classList.toggle('is-raining', raining);
-  elements.minuteDot.classList.toggle('is-raining', raining);
+  elements.minuteSummary.textContent = minuteSummaryText(view, value);
+  elements.minuteSummary.classList.toggle('is-raining', view.raining);
+  elements.minuteDot.classList.toggle('is-raining', view.raining);
+
   const total = displayPrecipitation(view.total);
+  const peak = displayPrecipitation(view.peak);
   const unit = state.unit ? ' in' : ' mm';
   elements.minuteTotal.textContent = formatNumber(total, unit, 2);
-  elements.minutePeriod.textContent = raining
+  elements.minutePeriod.textContent = view.raining
     ? [formatTime(view.rainStart), formatTime(view.rainEnd)].filter(Boolean).join(' - ')
-    : value.minuteNoPeriod;
+    : view.trace
+      ? [value.minuteTracePeriod, [formatTime(view.traceStart), formatTime(view.traceEnd)].filter(Boolean).join(' - ')].filter(Boolean).join(' ')
+      : value.minuteNoPeriod;
+  elements.minuteThresholdHeavy.textContent = view.peak > 0
+    ? (isChinese() ? '\u6700\u9ad8 ' : 'Max ') + formatNumber(peak, unit, 2)
+    : '';
+  elements.minuteThresholdLight.textContent = '0' + unit;
+  elements.minuteLegend.textContent = value.minuteLegend;
   elements.minuteNote.textContent = value.minuteSource;
+
+  elements.minuteChart.replaceChildren();
+  const max = view.scale;
+  for (let index = 0; index < 24; ++index) {
+    const point = view.points[index];
+    const precipitation = point && Number(point.precip) || 0;
+    const intensity = point ? minutePrecipitationClass(precipitation) : 'none';
+    const bar = document.createElement('span');
+    bar.className = 'minute-bar minute-bar-' + intensity;
+    bar.style.height = intensity === 'none'
+      ? '0px'
+      : Math.max(intensity === 'trace' ? 2 : 3, Math.round(precipitation / max * 58)) + 'px';
+    if (point) {
+      bar.title = formatTime(point.time) + ' ' + formatNumber(displayPrecipitation(point.precip), unit, 2) +
+        ' - ' + minuteIntensityLabel(intensity);
+      bar.setAttribute('aria-label', bar.title);
+    }
+    elements.minuteChart.append(bar);
+  }
+
+  elements.minuteAxis.replaceChildren();
+  const axisLabels = [0, .25, .5, .75, 1].map((fraction) => {
+    const point = view.points[Math.round((view.points.length - 1) * fraction)];
+    return point ? formatTime(point.time) : '';
+  });
+  for (const label of axisLabels) {
+    const span = document.createElement('span');
+    span.textContent = label;
+    elements.minuteAxis.append(span);
+  }
 }
 
 function renderHourly() {
@@ -1100,7 +1172,7 @@ function renderHero(item) {
   const minute = state.mode === 'qweather' && state.datasets.minutely && state.datasets.minutely.data;
   const minuteView = minuteForecastView(minute);
   const summary = minuteView.available
-    ? (minuteView.raining ? value.minuteRain : value.minuteDry) + (minuteView.raining
+    ? minuteSummaryText(minuteView, value) + (minuteView.trace
       ? ' \u00b7 ' + formatNumber(displayPrecipitation(minuteView.total), state.unit ? ' in' : ' mm', 2)
       : '')
     : '';
