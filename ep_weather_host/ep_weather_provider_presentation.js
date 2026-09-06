@@ -39,7 +39,8 @@ function minuteForecastView(minute, hourly, now = Date.now()) {
     return minuteTime >= time && minuteTime < time + 3600000 && hour.pop === 0 && hour.precip === 0;
   }));
   return { points, available: valid.length > 0, raining: wet.length > 0,
-    scale: Math.max(0.1, ...valid.map((point) => point.precip)), conflict };
+    scale: Math.max(0.1, ...valid.map((point) => point.precip)),
+    total: valid.reduce((sum, point) => sum + point.precip, 0), conflict };
 }
 
 function datasetFailureDetails(errors, chinese) {

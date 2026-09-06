@@ -247,6 +247,7 @@ a { color: inherit; }
 .minute-axis { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 5px; color: var(--faint); font-size: 9px; }
 .minute-axis span:nth-child(2), .minute-axis span:nth-child(3), .minute-axis span:nth-child(4) { text-align: center; }
 .minute-axis span:last-child { text-align: right; }
+.minute-meta { margin-top: 7px; color: var(--muted); font-size: 9px; line-height: 1.35; }
 
 .hourly { display: flex; gap: 4px; min-height: 116px; padding: 9px 9px 6px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; }
 .hourly::-webkit-scrollbar { height: 7px; }
@@ -426,6 +427,7 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
         <div class="minute-chart" id="minute-chart"></div>
       </div>
       <div class="minute-axis" id="minute-axis"></div>
+      <div class="minute-meta" id="minute-meta"></div>
     </div>
   </section>
 

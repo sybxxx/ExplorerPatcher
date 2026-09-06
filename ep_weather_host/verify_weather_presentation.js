@@ -30,6 +30,7 @@ const dry = [{time:'2026-09-06T20:00:00+08:00', pop:0, precip:0}];
 let view = t.minuteForecastView(minute, dry, now);
 assert.equal(view.points.length, 2);
 assert.equal(view.points[0].precip, .08);
+assert.equal(view.total, .08);
 assert.equal(view.conflict, true);
 assert.equal(t.minuteForecastView(minute, [{...dry[0], pop:null}], now).conflict, false);
 assert.equal(t.minuteForecastView(minute, [{...dry[0], precip:1}], now).conflict, false);

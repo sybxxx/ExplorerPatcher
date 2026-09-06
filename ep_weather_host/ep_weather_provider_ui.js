@@ -36,6 +36,7 @@ const elements = {
   minuteThresholdLight: document.getElementById('minute-threshold-light'),
   minuteChart: document.getElementById('minute-chart'),
   minuteAxis: document.getElementById('minute-axis'),
+  minuteMeta: document.getElementById('minute-meta'),
   hourly: document.getElementById('hourly'),
   hourlyNote: document.getElementById('hourly-note'),
   hourlyLead: document.getElementById('hourly-lead'),
@@ -90,7 +91,7 @@ function labels() {
     feels: '\u4f53\u611f\u6e29\u5ea6',
     humidity: '\u76f8\u5bf9\u6e7f\u5ea6',
     wind: '\u98ce\u5411\u98ce\u901f',
-    precip: '\u5f53\u524d\u964d\u6c34',
+    precip: '\u8fd1 1 \u5c0f\u65f6\u964d\u6c34',
     visibility: '\u80fd\u89c1\u5ea6',
     updated: '\u66f4\u65b0',
     next2h: '\u672a\u6765 2 \u5c0f\u65f6\u964d\u6c34',
@@ -120,11 +121,9 @@ function labels() {
     primary: '\u9996\u8981\u6c61\u67d3\u7269',
     level: '\u7b49\u7ea7',
     rain: '\u964d\u96e8',
-    lightRain: '\u5c0f\u96e8',
-    moderateRain: '\u4e2d\u96e8',
     hourlyHint: '\u9010\u5c0f\u65f6\u5929\u6c14 \u00b7 \u964d\u96e8\u6982\u7387',
     dailyHint: '\u6e29\u5ea6\u8303\u56f4\u4e0e\u964d\u96e8\u6982\u7387',
-    minuteHint: '\u9010 5 \u5206\u949f\u9884\u6d4b',
+    minuteHint: '\u6bcf\u67f1\u4e3a 5 \u5206\u949f\u7d2f\u8ba1\u9884\u62a5',
     refresh: '\u5237\u65b0\u5929\u6c14',
     refreshing: '\u5237\u65b0\u4e2d...',
     refreshDone: '\u5df2\u66f4\u65b0',
@@ -147,7 +146,7 @@ function labels() {
     visibilityGood: '\u89c6\u91ce\u826f\u597d',
     visibilityFair: '\u89c6\u91ce\u4e00\u822c',
     visibilityLow: '\u80fd\u89c1\u5ea6\u8f83\u4f4e',
-    observed: '\u5f53\u524d\u89c2\u6d4b'
+    observed: '\u8fd1 1 \u5c0f\u65f6\u7d2f\u8ba1'
   } : {
     loading: 'Loading...',
     error: 'Unable to load weather',
@@ -169,7 +168,7 @@ function labels() {
     feels: 'Feels like',
     humidity: 'Humidity',
     wind: 'Wind',
-    precip: 'Precipitation',
+    precip: 'Last-hour precipitation',
     visibility: 'Visibility',
     updated: 'Updated',
     next2h: 'Precipitation in the next 2 hours',
@@ -199,11 +198,9 @@ function labels() {
     primary: 'Primary',
     level: 'Level',
     rain: 'Rain',
-    lightRain: 'Light rain',
-    moderateRain: 'Moderate rain',
     hourlyHint: 'Hourly weather \u00b7 rain chance',
     dailyHint: 'Temperature range and rain chance',
-    minuteHint: 'Every 5 minutes',
+    minuteHint: 'Each bar: 5-minute forecast total',
     refresh: 'Refresh weather',
     refreshing: 'Refreshing...',
     refreshDone: 'Updated',
@@ -226,7 +223,7 @@ function labels() {
     visibilityGood: 'Good visibility',
     visibilityFair: 'Fair visibility',
     visibilityLow: 'Low visibility',
-    observed: 'Current observation'
+    observed: 'Last-hour total'
   };
 }
 
@@ -425,6 +422,7 @@ function setLoading() {
   elements.minuteDot.classList.remove('is-raining');
   elements.minuteThresholdHeavy.textContent = '';
   elements.minuteThresholdLight.textContent = '';
+  elements.minuteMeta.textContent = '';
   elements.airSection.hidden = true;
   elements.airLead.textContent = '';
   elements.aqiScaleDot.style.left = '0%';
@@ -798,6 +796,7 @@ function renderMinuteForecast() {
     elements.minuteThresholdLight.textContent = '';
     elements.minuteChart.replaceChildren();
     elements.minuteAxis.replaceChildren();
+    elements.minuteMeta.textContent = '';
     return;
   }
   elements.minuteUpdated.textContent = [value.minutePoints, formatTime(minute.updated)].filter(Boolean).join(' | ');
@@ -806,12 +805,19 @@ function renderMinuteForecast() {
   const forecastLabel = isChinese() ? '\u548c\u98ce\u5206\u949f\u9884\u62a5: ' : 'QWeather minutely forecast: ';
   elements.minuteSummary.textContent = forecastLabel + (minute.summary || (raining ? value.next2h : value.noRain));
   if (view.conflict) elements.minuteSummary.textContent += isChinese()
-    ? ' | \u4e0e\u9010\u5c0f\u65f6\u9884\u62a5\u5b58\u5728\u5206\u6b67'
-    : ' | Differs from hourly forecast';
+    ? ' | \u4e0e\u9010\u5c0f\u65f6\u9884\u62a5\u6570\u503c\u4e0d\u540c\uff08\u65f6\u95f4\u7c92\u5ea6\u4e0d\u540c\uff09'
+    : ' | Different values from hourly forecast (different time scale)';
   elements.minuteSummary.classList.toggle('is-raining', raining);
   elements.minuteDot.classList.toggle('is-raining', raining);
-  elements.minuteThresholdHeavy.textContent = view.scale.toFixed(2) + ' mm';
-  elements.minuteThresholdLight.textContent = '0 mm';
+  const peak = displayPrecipitation(view.scale);
+  const total = displayPrecipitation(view.total);
+  const unit = state.unit ? ' in' : ' mm';
+  elements.minuteThresholdHeavy.textContent = (isChinese() ? '\u5cf0\u503c ' : 'Peak ') +
+    formatNumber(peak, unit, 2);
+  elements.minuteThresholdLight.textContent = '0' + unit;
+  elements.minuteMeta.textContent = isChinese()
+    ? `\u6bcf\u6839\u67f1 = \u672a\u6765 5 \u5206\u949f\u7d2f\u8ba1\u9884\u62a5 \u00b7 \u672a\u6765 2 \u5c0f\u65f6\u9884\u8ba1\u7d2f\u8ba1 ${formatNumber(total, unit, 2)} \u00b7 \u5355\u6bb5\u5cf0\u503c ${formatNumber(peak, unit, 2)}`
+    : `Each bar = next 5-minute forecast total \u00b7 Next 2-hour forecast total ${formatNumber(total, unit, 2)} \u00b7 Peak interval ${formatNumber(peak, unit, 2)}`;
   elements.minuteChart.replaceChildren();
   const max = view.scale;
   for (let index = 0; index < points.length; ++index) {
@@ -1093,6 +1099,11 @@ function displayWindSpeed(value) {
   return state.unit ? Number(value) / 1.609344 : Number(value);
 }
 
+function displayPrecipitation(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+  return state.unit ? Number(value) / 25.4 : Number(value);
+}
+
 function renderHero(item) {
   const value = labels();
   const daily = dailySource().rows[0];
@@ -1104,9 +1115,9 @@ function renderHero(item) {
 
   const minute = state.mode === 'qweather' && state.datasets.minutely && state.datasets.minutely.data;
   const minuteView = minuteForecastView(minute, state.datasets.hourly && state.datasets.hourly.data);
-  const summary = minuteView.available ? (minuteView.conflict
-    ? (isChinese() ? '\u5206\u949f\u4e0e\u9010\u5c0f\u65f6\u964d\u6c34\u9884\u62a5\u5b58\u5728\u5206\u6b67' : 'Precipitation forecasts differ')
-    : (isChinese() ? '\u5206\u949f\u9884\u62a5: ' : 'Minutely forecast: ') + textValue(minute.summary)) : '';
+  const summary = minuteView.available
+    ? (isChinese() ? '\u5206\u949f\u9884\u62a5: ' : 'Minutely forecast: ') + textValue(minute.summary)
+    : '';
   elements.heroSummary.textContent = summary;
   elements.heroSummary.hidden = !summary;
 
@@ -1132,9 +1143,7 @@ function renderMetrics(item) {
   elements.humidity.textContent = formatNumber(item.humidity, '%');
   elements.wind.textContent = (item.windDir ? formatWindDirection(item.windDir) + ' ' : '') +
     formatNumber(displayWindSpeed(item.windSpeed), state.unit ? ' mph' : ' km/h');
-  const precipitation = item.precip === null || item.precip === undefined
-    ? null
-    : state.unit ? Number(item.precip) / 25.4 : Number(item.precip);
+  const precipitation = displayPrecipitation(item.precip);
   const visibility = item.visibility === null || item.visibility === undefined
     ? null
     : state.unit ? Number(item.visibility) / 1.609344 : Number(item.visibility);
