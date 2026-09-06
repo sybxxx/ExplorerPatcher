@@ -71,6 +71,7 @@ function pick(object, names, fallback = null) {
 }
 
 function finiteNumber(value, fallback = null) {
+  if (value === null || value === undefined || typeof value === 'string' && !value.trim()) return fallback;
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 }
@@ -467,12 +468,12 @@ function normalizeQDaily(raw) {
 function normalizeQMinutely(raw) {
   const rows = Array.isArray(raw && raw.minutely) ? raw.minutely : [];
   return {
-    available: finiteNumber(raw && raw.code, 200) !== 204,
+    available: finiteNumber(raw && raw.code, 200) !== 204 && rows.length > 0,
     summary: textValue(raw && raw.summary),
     updated: textValue(pick(raw || {}, ['updateTime'])),
     points: rows.map((row) => ({
       time: textValue(pick(row, ['fxTime', 'time'])),
-      precip: finiteNumber(pick(row, ['precip', 'precipitation']), 0),
+      precip: finiteNumber(pick(row, ['precip', 'precipitation'])),
       type: textValue(pick(row, ['type', 'precipitationType']))
     })),
     refer: normalizeRefer(raw)

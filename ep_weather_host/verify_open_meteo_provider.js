@@ -28,6 +28,7 @@ const zhCnGuiPath = path.join(
 );
 
 childProcess.execFileSync(process.execPath, [path.join(root, 'generate_weather_provider_header.js'), '--check']);
+childProcess.execFileSync(process.execPath, [path.join(root, 'verify_weather_presentation.js')]);
 
 const source = fs.readFileSync(headerPath, 'utf8').replace(/\r?\n/g, '\n');
 const start = source.indexOf('static const WCHAR ep_weather_provider_open_meteo_html[]');
@@ -351,6 +352,11 @@ const locationSource = fs.readFileSync(path.join(root, 'ep_weather_location.cpp'
 assert.match(weatherHeader, /EP_WEATHER_WM_SYNC_THEME \(WM_USER \+ 20\)/);
 assert.ok(!weatherHeader.includes('EP_WEATHER_WM_SYNC_THEME (WM_USER + 19)'), 'Theme synchronization must not reuse the native location message ID.');
 assert.ok(!locationHeader.includes('EP_WEATHER_WM_AUTO_LOCATION_RESULT (WM_USER + 20)'), 'Theme synchronization must not collide with native location messages.');
+const settingChangeStart = hostSource.indexOf('else if (uMsg == WM_SETTINGCHANGE)');
+const settingChangeEnd = hostSource.indexOf('else if (uMsg == WM_DPICHANGED)', settingChangeStart);
+const settingChangeBranch = hostSource.slice(settingChangeStart, settingChangeEnd);
+assert.ok(settingChangeBranch.includes('epw_Weather_SetDarkMode(_this, dwDarkMode, FALSE)'), 'System theme changes must update the existing WebView without reloading it.');
+assert.ok(!settingChangeBranch.includes('epw_Weather_SetDarkMode(_this, dwDarkMode, TRUE)'), 'System theme changes must not trigger a weather data reload.');
 assert.match(
   hostSource,
   /InterlockedExchange64\(&_this->bAllowEmbeddedNavigation, TRUE\)[\s\S]*?NavigateToString/

@@ -140,6 +140,7 @@ The maintainable provider sources are:
 - `ep_weather_host/ep_weather_provider_shell.html`
 - `ep_weather_host/ep_weather_provider_data.js`
 - `ep_weather_host/ep_weather_provider_icons.js`
+- `ep_weather_host/ep_weather_provider_presentation.js`
 - `ep_weather_host/ep_weather_provider_theme.js`
 - `ep_weather_host/ep_weather_provider_ui.js`
 - `ep_weather_host/ep_weather_location.cpp`
@@ -152,6 +153,7 @@ Run the following after editing them:
 ```powershell
 node ep_weather_host\generate_weather_provider_header.js
 node ep_weather_host\verify_open_meteo_provider.js
+node ep_weather_host\verify_weather_presentation.js
 pwsh -File ep_weather_host\verify_qweather_config.ps1
 ```
 

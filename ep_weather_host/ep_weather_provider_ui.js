@@ -270,7 +270,7 @@ function openMeteoCondition(code) {
 }
 
 function weatherText(item, provider) {
-  return textValue(item && item.text) || (provider === 'qweather'
+  return (provider === 'qweather' ? localizedQWeatherText(item, isChinese()) : textValue(item && item.text)) || (provider === 'qweather'
     ? (isChinese() ? '\u672a\u77e5\u5929\u6c14' : 'Unknown weather')
     : openMeteoCondition(item && item.code));
 }
@@ -395,6 +395,7 @@ function setLoading() {
   elements.location.textContent = state.location || automaticLocationLabel();
   elements.resolved.textContent = '';
   elements.providerState.textContent = '';
+  document.getElementById('provider-problems').hidden = true;
   elements.providerState.classList.remove('warning');
   elements.updateStatus.textContent = '';
   elements.condition.textContent = value.loading;
@@ -450,6 +451,10 @@ function setError() {
 
 function renderProviderState() {
   const value = labels();
+  elements.providerState.title = datasetFailureDetails(state.errors, isChinese());
+  const problems = document.getElementById('provider-problems');
+  problems.textContent = elements.providerState.title;
+  problems.hidden = !problems.textContent;
   elements.providerState.classList.remove('warning');
   if (state.qAuthFailed) {
     elements.providerState.textContent = state.mode === 'qweather'
@@ -783,7 +788,8 @@ function renderMinuteForecast() {
   }
   elements.minuteSection.hidden = false;
   elements.minuteLead.textContent = value.minuteHint;
-  if (minute.available === false) {
+  const view = minuteForecastView(minute, state.datasets.hourly && state.datasets.hourly.data);
+  if (!view.available) {
     elements.minuteUpdated.textContent = '';
     elements.minuteSummary.textContent = value.unavailable;
     elements.minuteSummary.classList.remove('is-raining');
@@ -795,31 +801,33 @@ function renderMinuteForecast() {
     return;
   }
   elements.minuteUpdated.textContent = [value.minutePoints, formatTime(minute.updated)].filter(Boolean).join(' | ');
-  const points = Array.isArray(minute.points) ? minute.points.slice(0, 24) : [];
-  const raining = points.some((point) => Number(point.precip) > 0);
-  elements.minuteSummary.textContent = minute.summary || (raining ? value.next2h : value.noRain);
+  const points = view.points;
+  const raining = view.raining;
+  const forecastLabel = isChinese() ? '\u548c\u98ce\u5206\u949f\u9884\u62a5: ' : 'QWeather minutely forecast: ';
+  elements.minuteSummary.textContent = forecastLabel + (minute.summary || (raining ? value.next2h : value.noRain));
+  if (view.conflict) elements.minuteSummary.textContent += isChinese()
+    ? ' | \u4e0e\u9010\u5c0f\u65f6\u9884\u62a5\u5b58\u5728\u5206\u6b67'
+    : ' | Differs from hourly forecast';
   elements.minuteSummary.classList.toggle('is-raining', raining);
   elements.minuteDot.classList.toggle('is-raining', raining);
-  elements.minuteThresholdHeavy.textContent = value.moderateRain + ' >= 0.15 mm';
-  elements.minuteThresholdLight.textContent = value.lightRain + ' >= 0.05 mm';
+  elements.minuteThresholdHeavy.textContent = view.scale.toFixed(2) + ' mm';
+  elements.minuteThresholdLight.textContent = '0 mm';
   elements.minuteChart.replaceChildren();
-  const max = Math.max(0.1, ...points.map((point) => Number(point.precip) || 0));
-  for (let index = 0; index < 24; ++index) {
-    const point = points[index] || { precip: 0 };
+  const max = view.scale;
+  for (let index = 0; index < points.length; ++index) {
+    const point = points[index];
     const bar = document.createElement('span');
     const precipitation = Number(point.precip) || 0;
-    const intensity = precipitation >= 0.15 ? 'heavy'
-      : precipitation >= 0.05 ? 'rain' : precipitation > 0 ? 'drizzle' : 'none';
+    const intensity = precipitation > 0 ? 'drizzle' : 'none';
     bar.className = 'minute-bar minute-bar-' + intensity;
     bar.style.height = Math.max(2, Math.round(precipitation / max * 46)) + 'px';
-    bar.title = formatTime(point.time) + ' ' + formatNumber(point.precip, ' mm', 1);
+    bar.title = formatTime(point.time) + ' ' + formatNumber(point.precip, ' mm', 2);
     bar.setAttribute('aria-label', bar.title);
     elements.minuteChart.append(bar);
   }
   elements.minuteAxis.replaceChildren();
-  const axisLabels = isChinese()
-    ? ['\u73b0\u5728', '30 \u5206\u949f', '60 \u5206\u949f', '90 \u5206\u949f', '120 \u5206\u949f']
-    : ['Now', '30 min', '60 min', '90 min', '120 min'];
+  const axisLabels = [0, .25, .5, .75, 1].map((fraction) =>
+    formatTime(points[Math.round((points.length - 1) * fraction)].time));
   for (const label of axisLabels) {
     const span = document.createElement('span');
     span.textContent = label;
@@ -1095,7 +1103,10 @@ function renderHero(item) {
   elements.heroRange.hidden = !dailyRange;
 
   const minute = state.mode === 'qweather' && state.datasets.minutely && state.datasets.minutely.data;
-  const summary = minute && minute.available !== false ? textValue(minute.summary) : '';
+  const minuteView = minuteForecastView(minute, state.datasets.hourly && state.datasets.hourly.data);
+  const summary = minuteView.available ? (minuteView.conflict
+    ? (isChinese() ? '\u5206\u949f\u4e0e\u9010\u5c0f\u65f6\u964d\u6c34\u9884\u62a5\u5b58\u5728\u5206\u6b67' : 'Precipitation forecasts differ')
+    : (isChinese() ? '\u5206\u949f\u9884\u62a5: ' : 'Minutely forecast: ') + textValue(minute.summary)) : '';
   elements.heroSummary.textContent = summary;
   elements.heroSummary.hidden = !summary;
 

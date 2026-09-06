@@ -117,6 +117,7 @@ a { color: inherit; }
 .topbar-status { display: flex; align-items: baseline; min-width: 0; flex: 0 1 auto; gap: 7px; }
 .provider-state { max-width: 160px; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .provider-state.warning { color: var(--orange); font-weight: 650; }
+.provider-problems { padding: 8px 20px; color: var(--orange); font-size: 12px; overflow-wrap: anywhere; border-bottom: 1px solid var(--line); }
 .update-status { max-width: 120px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-actions { display: flex; align-items: center; gap: 6px; }
 .icon-button {
@@ -378,6 +379,7 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
       </div>
     </div>
   </header>
+  <div id="provider-problems" class="provider-problems" hidden></div>
 
   <div class="alerts" id="alerts" hidden></div>
 
@@ -472,6 +474,7 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
 /*__EP_WEATHER_DATA__*/
 /*__EP_WEATHER_ICONS__*/
 /*__EP_WEATHER_THEME__*/
+/*__EP_WEATHER_PRESENTATION__*/
 /*__EP_WEATHER_UI__*/
 })();
 </script>

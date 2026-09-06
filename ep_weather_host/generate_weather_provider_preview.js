@@ -10,7 +10,7 @@ const mockBootstrap = String.raw`<script>
 (function() {
   const scenario = new URLSearchParams(window.location.search).get('scenario') || 'ok';
   const hour = 60 * 60 * 1000;
-  const now = new Date('2026-09-02T14:00:00+08:00');
+  const now = new Date();
   const iso = (date) => date.toISOString().replace('.000Z', '+00:00');
   const hourly = Array.from({ length: 24 }, (_, index) => ({
     forecastTime: iso(new Date(now.getTime() + index * hour)),
@@ -37,6 +37,16 @@ const mockBootstrap = String.raw`<script>
     esri: { candidates: [{ location: { x: 112.57, y: 26.89 }, attributes: { ShortLabel: '\u84b8\u6e58\u533a', City: '\u8861\u9633\u5e02', Country: '\u4e2d\u56fd' } }] },
     openMeteo: { current: { time: '2026-09-02T14:00', temperature_2m: 28, apparent_temperature: 31, relative_humidity_2m: 80, weather_code: 61, is_day: 1, wind_speed_10m: 10, precipitation: 0.4, surface_pressure: 998, visibility: 15000, cloud_cover: 88, dew_point_2m: 23 }, hourly: { time: hourly.map((row) => new Date(new Date(row.forecastTime).getTime() + 8 * hour).toISOString().slice(0, 16)), temperature_2m: hourly.map((row) => row.temperature.value), apparent_temperature: hourly.map((row) => row.feelsLike.value), relative_humidity_2m: hourly.map((row) => row.humidity * 100), precipitation_probability: hourly.map((row) => row.precipitation.probability * 100), precipitation: hourly.map((row) => row.precipitation.amount.value), weather_code: hourly.map(() => 61), is_day: hourly.map(() => 1), wind_speed_10m: hourly.map(() => 10) }, daily: { time: ['2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05', '2026-09-06'], weather_code: [61, 3, 2, 2, 1], temperature_2m_max: [30, 29, 30, 31, 31], temperature_2m_min: [24, 23, 23, 24, 24], precipitation_probability_max: [78, 40, 20, 20, 10] } }
   };
+  if (scenario === 'conflict') {
+    payloads.hourly.hours.forEach((row) => {
+      row.condition = { code: '100', text: 'Sunny' };
+      row.precipitation = { amount: { value: 0, unit: 'mm' }, probability: 0, type: 'none' };
+    });
+  }
+  if (scenario === 'english') {
+    payloads.current.condition = { code: '100', text: 'Sunny' };
+    payloads.hourly.hours.forEach((row) => { row.condition = { code: '100', text: 'Sunny' }; });
+  }
   const nativeMessageListeners = [];
   window.chrome = { webview: {
     addEventListener: function(type, listener) {

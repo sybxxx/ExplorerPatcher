@@ -77,6 +77,7 @@ function buildHtml() {
   html = replaceMarker(html, '/*__EP_WEATHER_DATA__*/', data);
   html = replaceMarker(html, '/*__EP_WEATHER_ICONS__*/', icons);
   html = replaceMarker(html, '/*__EP_WEATHER_THEME__*/', theme);
+  html = replaceMarker(html, '/*__EP_WEATHER_PRESENTATION__*/', readNormalized(path.join(root, 'ep_weather_provider_presentation.js')));
   html = replaceMarker(html, '/*__EP_QWEATHER_ICON_MAP__*/', iconMap);
   html = replaceMarker(html, '/*__EP_WEATHER_UI__*/', ui);
   return html + '\n';

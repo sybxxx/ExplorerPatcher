@@ -2352,7 +2352,7 @@ LRESULT CALLBACK epw_Weather_WindowProc(_In_ HWND hWnd, _In_ UINT uMsg, _In_ WPA
             }
             if (!dwDarkMode)
             {
-                epw_Weather_SetDarkMode(_this, dwDarkMode, TRUE);
+                epw_Weather_SetDarkMode(_this, dwDarkMode, FALSE);
             }
             return 0;
         }
@@ -2499,6 +2499,7 @@ HRESULT STDMETHODCALLTYPE epw_Weather_SetDarkMode(EPWeather* _this, LONG64 dwDar
     {
         return E_INVALIDARG;
     }
+    if (RefreshImmersiveColorPolicyState) RefreshImmersiveColorPolicyState();
     LONG64 bEnabled;
     epw_Weather_IsDarkMode(_this, dwDarkMode, &bEnabled);
     InterlockedExchange64(&_this->g_darkModeEnabled, dwDarkMode);
@@ -2506,10 +2507,9 @@ HRESULT STDMETHODCALLTYPE epw_Weather_SetDarkMode(EPWeather* _this, LONG64 dwDar
         (dwDarkMode == EP_WEATHER_THEME_LIGHT && !bEnabled) ||
         dwDarkMode == EP_WEATHER_THEME_SYSTEM)
     {
-        RefreshImmersiveColorPolicyState();
         if (_this->hWnd)
         {
-            AllowDarkModeForWindow(_this->hWnd, bEnabled);
+            if (AllowDarkModeForWindow) AllowDarkModeForWindow(_this->hWnd, bEnabled);
             int s = 0;
             if (global_rovi.dwBuildNumber < 18985)
             {
@@ -2518,7 +2518,7 @@ HRESULT STDMETHODCALLTYPE epw_Weather_SetDarkMode(EPWeather* _this, LONG64 dwDar
             DwmSetWindowAttribute(_this->hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE + s, &bEnabled, sizeof(BOOL));
             epw_Weather_ApplyNativeThemeColors(_this, (BOOL)bEnabled);
             //InvalidateRect(_this->hWnd, NULL, FALSE);
-            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_BROWSER_THEME, bEnabled, bRefresh);
+            PostMessageW(_this->hWnd, EP_WEATHER_WM_SET_BROWSER_THEME, bEnabled, FALSE);
             if (bRefresh)
             {
                 // Settings changes originate outside the WebView thread. Send
