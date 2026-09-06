@@ -234,20 +234,11 @@ a { color: inherit; }
 .minute-dot.is-raining { background: var(--orange); }
 .minute-summary { color: var(--text); font-size: 11px; font-weight: 650; line-height: 1.4; }
 .minute-summary.is-raining { color: var(--orange); }
-.minute-chart-wrap { position: relative; margin-top: 10px; padding-top: 3px; }
-.minute-chart { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 3px; height: 70px; padding-top: 4px; border-bottom: 1px solid var(--line); }
-.minute-thresholds { position: absolute; z-index: 0; inset: 4px 0 1px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
-.minute-threshold { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; border-top: 1px dashed var(--line); color: var(--faint); font-size: 8px; line-height: 1; }
-.minute-threshold span { padding-left: 4px; background: var(--surface); }
-.minute-bar { min-height: 2px; border-radius: 3px 3px 0 0; background: var(--blue); }
-.minute-bar-none { background: var(--line); }
-.minute-bar-drizzle { background: #64b5dc; }
-.minute-bar-rain { background: var(--blue); }
-.minute-bar-heavy { background: var(--orange); }
-.minute-axis { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 5px; color: var(--faint); font-size: 9px; }
-.minute-axis span:nth-child(2), .minute-axis span:nth-child(3), .minute-axis span:nth-child(4) { text-align: center; }
-.minute-axis span:last-child { text-align: right; }
-.minute-meta { margin-top: 7px; color: var(--muted); font-size: 9px; line-height: 1.35; }
+.minute-simple-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.minute-stat { min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-strong); }
+.minute-stat-label { display: block; color: var(--muted); font-size: 10px; }
+.minute-stat-value { display: block; margin-top: 3px; overflow-wrap: anywhere; color: var(--text); font-size: 15px; font-weight: 700; }
+.minute-note { margin-top: 9px; color: var(--muted); font-size: 9px; line-height: 1.4; }
 
 .hourly { display: flex; gap: 4px; min-height: 116px; padding: 9px 9px 6px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; }
 .hourly::-webkit-scrollbar { height: 7px; }
@@ -342,8 +333,7 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
   .section-title-row { align-items: flex-start; flex-direction: column; gap: 2px; }
   .section-title-group { width: 100%; }
   .section-lead { text-align: left; }
-  .minute-chart { gap: 2px; }
-  .minute-threshold { font-size: 7px; }
+  .minute-simple-grid { grid-template-columns: 1fr; }
   .air-grid { grid-template-columns: 1fr; }
   .aqi-main { padding: 0 0 12px; border-right: 0; border-bottom: 1px solid var(--line); }
   .day { grid-template-columns: 54px minmax(0, 1fr); grid-template-areas: "date weather" "date pop" "range range"; gap: 4px 6px; }
@@ -419,15 +409,11 @@ footer .source-list { max-width: 58%; overflow: hidden; text-overflow: ellipsis;
     </div>
     <div class="section-surface minute-surface">
       <div class="minute-summary-row"><span class="minute-dot" id="minute-dot" aria-hidden="true"></span><div class="minute-summary" id="minute-summary"></div></div>
-      <div class="minute-chart-wrap">
-        <div class="minute-thresholds" aria-hidden="true">
-          <div class="minute-threshold"><span id="minute-threshold-heavy"></span></div>
-          <div class="minute-threshold"><span id="minute-threshold-light"></span></div>
-        </div>
-        <div class="minute-chart" id="minute-chart"></div>
+      <div class="minute-simple-grid">
+        <div class="minute-stat"><span class="minute-stat-label" id="minute-total-label">Forecast total</span><strong class="minute-stat-value" id="minute-total">--</strong></div>
+        <div class="minute-stat"><span class="minute-stat-label" id="minute-period-label">Rain period</span><strong class="minute-stat-value" id="minute-period">--</strong></div>
       </div>
-      <div class="minute-axis" id="minute-axis"></div>
-      <div class="minute-meta" id="minute-meta"></div>
+      <div class="minute-note" id="minute-note"></div>
     </div>
   </section>
 

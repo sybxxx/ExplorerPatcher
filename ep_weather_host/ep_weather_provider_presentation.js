@@ -26,21 +26,17 @@ function localizedQWeatherText(item, chinese) {
   return text;
 }
 
-function minuteForecastView(minute, hourly, now = Date.now()) {
+function minuteForecastView(minute, now = Date.now()) {
   const points = (minute && minute.available !== false && Array.isArray(minute.points) ? minute.points : [])
     .filter((point) => Number.isFinite(Date.parse(point.time)) && Date.parse(point.time) + 300000 > now)
     .slice(0, 24);
   const valid = points.filter((point) => point.precip !== null && Number.isFinite(point.precip) && point.precip >= 0);
   const wet = valid.filter((point) => point.precip > 0);
-  // Compare only overlapping hourly periods; never infer dry conditions from missing data.
-  const conflict = wet.some((point) => (hourly || []).some((hour) => {
-    const time = Date.parse(hour.time);
-    const minuteTime = Date.parse(point.time);
-    return minuteTime >= time && minuteTime < time + 3600000 && hour.pop === 0 && hour.precip === 0;
-  }));
+  const firstWet = wet[0] || null;
+  const lastWet = wet[wet.length - 1] || null;
   return { points, available: valid.length > 0, raining: wet.length > 0,
-    scale: Math.max(0.1, ...valid.map((point) => point.precip)),
-    total: valid.reduce((sum, point) => sum + point.precip, 0), conflict };
+    total: valid.reduce((sum, point) => sum + point.precip, 0),
+    rainStart: firstWet && firstWet.time || '', rainEnd: lastWet && lastWet.time || '' };
 }
 
 function datasetFailureDetails(errors, chinese) {

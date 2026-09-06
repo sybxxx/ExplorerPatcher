@@ -32,11 +32,11 @@ const elements = {
   minuteUpdated: document.getElementById('minute-updated'),
   minuteSummary: document.getElementById('minute-summary'),
   minuteDot: document.getElementById('minute-dot'),
-  minuteThresholdHeavy: document.getElementById('minute-threshold-heavy'),
-  minuteThresholdLight: document.getElementById('minute-threshold-light'),
-  minuteChart: document.getElementById('minute-chart'),
-  minuteAxis: document.getElementById('minute-axis'),
-  minuteMeta: document.getElementById('minute-meta'),
+  minuteTotalLabel: document.getElementById('minute-total-label'),
+  minuteTotal: document.getElementById('minute-total'),
+  minutePeriodLabel: document.getElementById('minute-period-label'),
+  minutePeriod: document.getElementById('minute-period'),
+  minuteNote: document.getElementById('minute-note'),
   hourly: document.getElementById('hourly'),
   hourlyNote: document.getElementById('hourly-note'),
   hourlyLead: document.getElementById('hourly-lead'),
@@ -116,14 +116,20 @@ function labels() {
     instruction: '\u9632\u5fa1\u6307\u5357',
     officialAlert: '\u5b98\u65b9\u9884\u8b66',
     noRain: '\u672a\u6765 2 \u5c0f\u65f6\u6682\u65e0\u660e\u663e\u964d\u6c34',
-    minutePoints: '\u6bcf 5 \u5206\u949f',
+    minutePoints: '\u6bcf 5 \u5206\u949f\u66f4\u65b0',
+    minuteHint: '\u672a\u6765 2 \u5c0f\u65f6\u6982\u89c8',
+    minuteRain: '\u672a\u6765 2 \u5c0f\u65f6\u9884\u8ba1\u6709\u96e8',
+    minuteDry: '\u672a\u6765 2 \u5c0f\u65f6\u6682\u65e0\u660e\u663e\u964d\u96e8',
+    minuteTotalLabel: '\u9884\u8ba1\u7d2f\u8ba1\u964d\u96e8',
+    minutePeriodLabel: '\u9884\u8ba1\u964d\u96e8\u65f6\u6bb5',
+    minuteNoPeriod: '\u6682\u65e0',
+    minuteSource: '\u548c\u98ce\u5929\u6c14 \u00b7 \u6bcf 5 \u5206\u949f\u66f4\u65b0',
     qweather: '\u548c\u98ce\u5929\u6c14',
     primary: '\u9996\u8981\u6c61\u67d3\u7269',
     level: '\u7b49\u7ea7',
     rain: '\u964d\u96e8',
     hourlyHint: '\u9010\u5c0f\u65f6\u5929\u6c14 \u00b7 \u964d\u96e8\u6982\u7387',
     dailyHint: '\u6e29\u5ea6\u8303\u56f4\u4e0e\u964d\u96e8\u6982\u7387',
-    minuteHint: '\u6bcf\u67f1\u4e3a 5 \u5206\u949f\u7d2f\u8ba1\u9884\u62a5',
     refresh: '\u5237\u65b0\u5929\u6c14',
     refreshing: '\u5237\u65b0\u4e2d...',
     refreshDone: '\u5df2\u66f4\u65b0',
@@ -193,14 +199,20 @@ function labels() {
     instruction: 'Safety guidance',
     officialAlert: 'Official alert',
     noRain: 'No significant precipitation in the next 2 hours',
-    minutePoints: 'Every 5 minutes',
+    minutePoints: 'Updates every 5 minutes',
+    minuteHint: 'Two-hour overview',
+    minuteRain: 'Rain is expected in the next 2 hours',
+    minuteDry: 'No significant rain is expected in the next 2 hours',
+    minuteTotalLabel: 'Forecast total',
+    minutePeriodLabel: 'Rain period',
+    minuteNoPeriod: 'None',
+    minuteSource: 'QWeather - updates every 5 minutes',
     qweather: 'QWeather',
     primary: 'Primary',
     level: 'Level',
     rain: 'Rain',
     hourlyHint: 'Hourly weather \u00b7 rain chance',
     dailyHint: 'Temperature range and rain chance',
-    minuteHint: 'Each bar: 5-minute forecast total',
     refresh: 'Refresh weather',
     refreshing: 'Refreshing...',
     refreshDone: 'Updated',
@@ -235,6 +247,8 @@ function setStaticLabels() {
   document.getElementById('precip-label').textContent = value.precip;
   document.getElementById('visibility-label').textContent = value.visibility;
   document.getElementById('minute-title').textContent = value.next2h;
+  elements.minuteTotalLabel.textContent = value.minuteTotalLabel;
+  elements.minutePeriodLabel.textContent = value.minutePeriodLabel;
   document.getElementById('hourly-title').textContent = value.hourly24;
   document.getElementById('air-title').textContent = value.air;
   document.getElementById('daily-title').textContent = value.daily5;
@@ -420,9 +434,9 @@ function setLoading() {
   elements.alerts.replaceChildren();
   elements.minuteSection.hidden = true;
   elements.minuteDot.classList.remove('is-raining');
-  elements.minuteThresholdHeavy.textContent = '';
-  elements.minuteThresholdLight.textContent = '';
-  elements.minuteMeta.textContent = '';
+  elements.minuteTotal.textContent = '--';
+  elements.minutePeriod.textContent = '';
+  elements.minuteNote.textContent = '';
   elements.airSection.hidden = true;
   elements.airLead.textContent = '';
   elements.aqiScaleDot.style.left = '0%';
@@ -786,59 +800,29 @@ function renderMinuteForecast() {
   }
   elements.minuteSection.hidden = false;
   elements.minuteLead.textContent = value.minuteHint;
-  const view = minuteForecastView(minute, state.datasets.hourly && state.datasets.hourly.data);
+  const view = minuteForecastView(minute);
   if (!view.available) {
     elements.minuteUpdated.textContent = '';
     elements.minuteSummary.textContent = value.unavailable;
     elements.minuteSummary.classList.remove('is-raining');
     elements.minuteDot.classList.remove('is-raining');
-    elements.minuteThresholdHeavy.textContent = '';
-    elements.minuteThresholdLight.textContent = '';
-    elements.minuteChart.replaceChildren();
-    elements.minuteAxis.replaceChildren();
-    elements.minuteMeta.textContent = '';
+    elements.minuteTotal.textContent = '--';
+    elements.minutePeriod.textContent = value.minuteNoPeriod;
+    elements.minuteNote.textContent = '';
     return;
   }
   elements.minuteUpdated.textContent = [value.minutePoints, formatTime(minute.updated)].filter(Boolean).join(' | ');
-  const points = view.points;
   const raining = view.raining;
-  const forecastLabel = isChinese() ? '\u548c\u98ce\u5206\u949f\u9884\u62a5: ' : 'QWeather minutely forecast: ';
-  elements.minuteSummary.textContent = forecastLabel + (minute.summary || (raining ? value.next2h : value.noRain));
-  if (view.conflict) elements.minuteSummary.textContent += isChinese()
-    ? ' | \u4e0e\u9010\u5c0f\u65f6\u9884\u62a5\u6570\u503c\u4e0d\u540c\uff08\u65f6\u95f4\u7c92\u5ea6\u4e0d\u540c\uff09'
-    : ' | Different values from hourly forecast (different time scale)';
+  elements.minuteSummary.textContent = raining ? value.minuteRain : value.minuteDry;
   elements.minuteSummary.classList.toggle('is-raining', raining);
   elements.minuteDot.classList.toggle('is-raining', raining);
-  const peak = displayPrecipitation(view.scale);
   const total = displayPrecipitation(view.total);
   const unit = state.unit ? ' in' : ' mm';
-  elements.minuteThresholdHeavy.textContent = (isChinese() ? '\u5cf0\u503c ' : 'Peak ') +
-    formatNumber(peak, unit, 2);
-  elements.minuteThresholdLight.textContent = '0' + unit;
-  elements.minuteMeta.textContent = isChinese()
-    ? `\u6bcf\u6839\u67f1 = \u672a\u6765 5 \u5206\u949f\u7d2f\u8ba1\u9884\u62a5 \u00b7 \u672a\u6765 2 \u5c0f\u65f6\u9884\u8ba1\u7d2f\u8ba1 ${formatNumber(total, unit, 2)} \u00b7 \u5355\u6bb5\u5cf0\u503c ${formatNumber(peak, unit, 2)}`
-    : `Each bar = next 5-minute forecast total \u00b7 Next 2-hour forecast total ${formatNumber(total, unit, 2)} \u00b7 Peak interval ${formatNumber(peak, unit, 2)}`;
-  elements.minuteChart.replaceChildren();
-  const max = view.scale;
-  for (let index = 0; index < points.length; ++index) {
-    const point = points[index];
-    const bar = document.createElement('span');
-    const precipitation = Number(point.precip) || 0;
-    const intensity = precipitation > 0 ? 'drizzle' : 'none';
-    bar.className = 'minute-bar minute-bar-' + intensity;
-    bar.style.height = Math.max(2, Math.round(precipitation / max * 46)) + 'px';
-    bar.title = formatTime(point.time) + ' ' + formatNumber(point.precip, ' mm', 2);
-    bar.setAttribute('aria-label', bar.title);
-    elements.minuteChart.append(bar);
-  }
-  elements.minuteAxis.replaceChildren();
-  const axisLabels = [0, .25, .5, .75, 1].map((fraction) =>
-    formatTime(points[Math.round((points.length - 1) * fraction)].time));
-  for (const label of axisLabels) {
-    const span = document.createElement('span');
-    span.textContent = label;
-    elements.minuteAxis.append(span);
-  }
+  elements.minuteTotal.textContent = formatNumber(total, unit, 2);
+  elements.minutePeriod.textContent = raining
+    ? [formatTime(view.rainStart), formatTime(view.rainEnd)].filter(Boolean).join(' - ')
+    : value.minuteNoPeriod;
+  elements.minuteNote.textContent = value.minuteSource;
 }
 
 function renderHourly() {
@@ -1114,9 +1098,11 @@ function renderHero(item) {
   elements.heroRange.hidden = !dailyRange;
 
   const minute = state.mode === 'qweather' && state.datasets.minutely && state.datasets.minutely.data;
-  const minuteView = minuteForecastView(minute, state.datasets.hourly && state.datasets.hourly.data);
+  const minuteView = minuteForecastView(minute);
   const summary = minuteView.available
-    ? (isChinese() ? '\u5206\u949f\u9884\u62a5: ' : 'Minutely forecast: ') + textValue(minute.summary)
+    ? (minuteView.raining ? value.minuteRain : value.minuteDry) + (minuteView.raining
+      ? ' \u00b7 ' + formatNumber(displayPrecipitation(minuteView.total), state.unit ? ' in' : ' mm', 2)
+      : '')
     : '';
   elements.heroSummary.textContent = summary;
   elements.heroSummary.hidden = !summary;

@@ -27,14 +27,14 @@ const minute = t.normalizeQMinutely({code:'200', minutely: [
   {fxTime: '2026-09-06T20:05:00+08:00', precip:'0'}
 ]});
 const dry = [{time:'2026-09-06T20:00:00+08:00', pop:0, precip:0}];
-let view = t.minuteForecastView(minute, dry, now);
+let view = t.minuteForecastView(minute, now);
 assert.equal(view.points.length, 2);
 assert.equal(view.points[0].precip, .08);
 assert.equal(view.total, .08);
-assert.equal(view.conflict, true);
-assert.equal(t.minuteForecastView(minute, [{...dry[0], pop:null}], now).conflict, false);
-assert.equal(t.minuteForecastView(minute, [{...dry[0], precip:1}], now).conflict, false);
-assert.equal(t.minuteForecastView(minute, dry, now + 3 * 3600000).available, false);
+assert.equal(view.raining, true);
+assert.equal(view.rainStart, '2026-09-06T20:00:00+08:00');
+assert.equal(view.rainEnd, '2026-09-06T20:00:00+08:00');
+assert.equal(t.minuteForecastView(minute, now + 3 * 3600000).available, false);
 assert.equal(t.normalizeQMinutely({code:'200'}).available, false);
 assert.equal(t.normalizeQMinutely({code:'204'}).available, false);
 assert.equal(t.normalizeQMinutely({minutely:[{fxTime:dry[0].time}]}).points[0].precip, null);
