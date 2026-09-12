@@ -1,11 +1,14 @@
 ﻿#include "utility.h"
 #include "ImmersiveColor.h"
+#include "TaskbarNotificationRecovery.h"
 
 #include <dcomptypes.h>
 
 #include <wrl/implements.h>
 #include <wrl/wrappers/corewrappers.h>
 #include <wil/result_macros.h>
+
+extern "C" DWORD bOldTaskbar;
 
 #pragma region "Enable old taskbar"
 /***
@@ -38,6 +41,11 @@ public:
     STDMETHODIMP InitializeWithTray(ITrayUIHost* host, ITrayUI** result) override
     {
         RETURN_IF_FAILED(explorer_TrayUI_CreateInstanceFunc(host, IID_ITrayUI, (void**)result));
+
+        if (bOldTaskbar >= 2)
+        {
+            ScheduleTaskbarNotificationIconRecovery();
+        }
 
         // Fix delayed logon when using the Windows 10 taskbar on Windows 11 21H2.
         // Not present in 51, present in 120 onwards. 65, 71, and 100 are not checked yet.

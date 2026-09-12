@@ -205,6 +205,7 @@ BOOL g_bIsDesktopRaised = FALSE;
 #include "../libs/sws/SimpleWindowSwitcher/sws_WindowSwitcher.h"
 #endif
 #include "SettingsMonitor.h"
+#include "TaskbarNotificationRecovery.h"
 #include "HideExplorerSearchBar.h"
 #include "ImmersiveFlyouts.h"
 #include "updates.h"
@@ -634,9 +635,13 @@ LRESULT CALLBACK EP_Service_Window_WndProc(
         InvokeClockFlyout();
         return 0;
     }
-    else if (uMsg == s_uTaskbarRestart && bOldTaskbar && (dwOldTaskbarAl || dwMMOldTaskbarAl))
+    else if (uMsg == s_uTaskbarRestart && bOldTaskbar >= 2)
     {
-        SetTimer(hWnd, 1, 1000, NULL);
+        ScheduleTaskbarNotificationIconRecovery();
+        if (dwOldTaskbarAl || dwMMOldTaskbarAl)
+        {
+            SetTimer(hWnd, 1, 1000, NULL);
+        }
     }
     else if (uMsg == WM_TIMER && wParam < 3)
     {
@@ -689,6 +694,10 @@ DWORD EP_ServiceWindowThread(DWORD unused)
     );
     if (hWndServiceWindow)
     {
+        if (bOldTaskbar >= 2)
+        {
+            ScheduleTaskbarNotificationIconRecovery();
+        }
         if (IsSpotlightEnabled() && dwSpotlightUpdateSchedule) SetTimer(hWndServiceWindow, 100, dwSpotlightUpdateSchedule * 1000, NULL);
         if (bClockFlyoutOnWinC)
         {

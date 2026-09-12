@@ -255,6 +255,9 @@
     <ClCompile Include="Taskbar10.cpp">
       <ExcludedFromBuild Condition="'$(WithMainPatcher)'!='true'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="TaskbarNotificationRecovery.c">
+      <ExcludedFromBuild Condition="'$(WithMainPatcher)'!='true'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="TaskbarCenter.cpp">
       <ExcludedFromBuild Condition="'$(WithMainPatcher)'!='true'">true</ExcludedFromBuild>
     </ClCompile>
@@ -305,6 +308,7 @@
     <ClInclude Include="StartupSound.h" />
     <ClInclude Include="symbols.h" />
     <ClInclude Include="TaskbarCenter.h" />
+    <ClInclude Include="TaskbarNotificationRecovery.h" />
     <ClInclude Include="updates.h" />
     <ClInclude Include="utility.h" />
     <ClInclude Include="inc\ClassicWinRtForwardDecl.h" />
